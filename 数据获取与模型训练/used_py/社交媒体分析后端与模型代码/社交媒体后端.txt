@@ -1,0 +1,66 @@
+# app.py - 主应用文件
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
+import json
+from datetime import datetime
+
+app = Flask(__name__)
+CORS(app)  # 解决跨域问题
+
+# 数据库配置
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://username:password@localhost/rumor_db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+
+# 数据模型
+class RumorData(db.Model):
+    __tablename__ = 'rumor_data'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    text = db.Column(db.Text, nullable=False)
+    image = db.Column(db.String(500))
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    source_platform = db.Column(db.String(50))
+    post_id = db.Column(db.String(100), unique=True)  # 防止重复
+    status = db.Column(db.String(20), default='unprocessed')  # unprocessed/processed
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'text': self.text,
+            'image': self.image,
+            'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            'source_platform': self.source_platform,
+            'status': self.status
+        }
+
+
+# 数据获取接口
+@app.route('/api/data', methods=['GET'])
+def get_data():
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+
+    # 按时间降序排列，分页查询
+    data = RumorData.query.order_by(RumorData.timestamp.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+
+    return jsonify({
+        'data': [item.to_dict() for item in data.items],
+        'total': data.total,
+        'page': page,
+        'per_page': per_page
+    })
+
+
+# 数据详情接口
+@app.route('/api/data/<int:data_id>', methods=['GET'])
+def get_data_detail(data_id):
+    item = RumorData.query.get_or_404(data_id)
+    return jsonify(item.to_dict())
+
+
+if __name__ == '__main__':
+    app.run(debug=True)

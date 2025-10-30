@@ -1,0 +1,182 @@
+<!-- DetectionResults.vue -->
+<template>
+  <div class="detection-results">
+    <h2>谣言检测结果</h2>
+    
+    <div class="control-panel">
+      <el-button type="primary" @click="refreshData">手动刷新</el-button>
+      <el-button @click="autoRefresh = !autoRefresh">
+        {{ autoRefresh ? '停止自动刷新' : '开启自动刷新' }}
+      </el-button>
+    </div>
+    
+    <el-table :data="results" style="width: 100%">
+      <el-table-column prop="text" label="文本内容" min-width="200">
+        <template slot-scope="scope">
+          <div class="text-cell">
+            {{ scope.row.text }}
+          </div>
+        </template>
+      </el-table-column>
+      
+      <el-table-column prop="source" label="来源" width="100"></el-table-column>
+      
+      <el-table-column prop="probability" label="谣言概率" width="120">
+        <template slot-scope="scope">
+          <span :class="getProbabilityClass(scope.row.probability)">
+            {{ scope.row.probability }}%
+          </span>
+        </template>
+      </el-table-column>
+      
+      <el-table-column prop="timestamp" label="时间" width="150"></el-table-column>
+      
+      <el-table-column label="操作" width="120">
+        <template slot-scope="scope">
+          <el-button 
+            size="mini" 
+            type="primary" 
+            @click="handleProcess(scope.row)"
+          >
+            处理
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    
+    <!-- 处理弹窗 -->
+    <el-dialog title="人工校验" :visible.sync="processDialogVisible">
+      <div v-if="currentRow">
+        <p><strong>文本内容：</strong>{{ currentRow.text }}</p>
+        <p><strong>谣言概率：</strong>{{ currentRow.probability }}%</p>
+        
+        <el-radio-group v-model="verificationResult">
+          <el-radio label="rumor">谣言</el-radio>
+          <el-radio label="non-rumor">非谣言</el-radio>
+        </el-radio-group>
+        
+        <div slot="footer" class="dialog-footer">
+          <el-button @click="processDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="confirmVerification">确认</el-button>
+        </div>
+      </div>
+    </el-dialog>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'DetectionResults',
+  data() {
+    return {
+      results: [],
+      autoRefresh: false,
+      refreshInterval: null,
+      processDialogVisible: false,
+      currentRow: null,
+      verificationResult: 'rumor'
+    }
+  },
+  mounted() {
+    this.loadDetectionResults()
+    this.startAutoRefresh()
+  },
+  beforeDestroy() {
+    this.stopAutoRefresh()
+  },
+  watch: {
+    autoRefresh(newVal) {
+      if (newVal) {
+        this.startAutoRefresh()
+      } else {
+        this.stopAutoRefresh()
+      }
+    }
+  },
+  methods: {
+    async loadDetectionResults() {
+      try {
+        const response = await this.$http.get('/api/detection-results')
+        this.results = response.data
+      } catch (error) {
+        console.error('加载检测结果失败:', error)
+        this.$message.error('加载失败')
+      }
+    },
+    
+    getProbabilityClass(probability) {
+      if (probability >= 90) return 'high-risk'
+      if (probability >= 60) return 'medium-risk'
+      return 'low-risk'
+    },
+    
+    handleProcess(row) {
+      this.currentRow = row
+      this.processDialogVisible = true
+    },
+    
+    async confirmVerification() {
+      try {
+        await this.$http.post('/api/verify-rumor', {
+          id: this.currentRow.id,
+          result: this.verificationResult
+        })
+        
+        this.$message.success('校验成功')
+        this.processDialogVisible = false
+        this.loadDetectionResults() // 刷新列表
+        
+      } catch (error) {
+        console.error('校验失败:', error)
+        this.$message.error('校验失败')
+      }
+    },
+    
+    refreshData() {
+      this.loadDetectionResults()
+    },
+    
+    startAutoRefresh() {
+      if (this.autoRefresh) {
+        this.refreshInterval = setInterval(() => {
+          this.loadDetectionResults()
+        }, 600000) // 10分钟
+      }
+    },
+    
+    stopAutoRefresh() {
+      if (this.refreshInterval) {
+        clearInterval(this.refreshInterval)
+        this.refreshInterval = null
+      }
+    }
+  }
+}
+</script>
+
+<style scoped>
+.high-risk {
+  color: #ff4d4f;
+  font-weight: bold;
+}
+
+.medium-risk {
+  color: #faad14;
+  font-weight: bold;
+}
+
+.low-risk {
+  color: #52c41a;
+}
+
+.text-cell {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.control-panel {
+  margin-bottom: 20px;
+}
+</style>

@@ -1,0 +1,27 @@
+# models.py - 补充处理日志模型
+from datetime import datetime
+
+class ProcessLog(db.Model):
+    __tablename__ = 'process_log'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    data_id = db.Column(db.Integer, db.ForeignKey('rumor_data.id'), nullable=False)
+    operation = db.Column(db.Enum('verify', 'modify'), nullable=False)
+    old_nature = db.Column(db.Enum('rumor', 'non-rumor'))
+    new_nature = db.Column(db.Enum('rumor', 'non-rumor'), nullable=False)
+    operator = db.Column(db.String(50), nullable=False)
+    operation_time = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # 关系
+    rumor_data = db.relationship('RumorData', backref=db.backref('logs', lazy=True))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'data_id': self.data_id,
+            'operation': self.operation,
+            'old_nature': self.old_nature,
+            'new_nature': self.new_nature,
+            'operator': self.operator,
+            'operation_time': self.operation_time.strftime('%Y-%m-%d %H:%M:%S')
+        }

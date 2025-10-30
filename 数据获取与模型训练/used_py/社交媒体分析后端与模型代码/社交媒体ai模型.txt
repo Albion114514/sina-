@@ -1,0 +1,95 @@
+# ml_model/rumor_detector.py
+import numpy as np
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, LSTM, Embedding
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+import joblib
+import jieba
+
+
+class RumorDetector:
+    def __init__(self):
+        self.vectorizer = None
+        self.model = None
+        self.max_features = 5000
+        self.max_sequence_length = 200
+
+    def preprocess_text(self, text):
+        """文本预处理"""
+        # 中文分词
+        words = jieba.cut(text)
+        return ' '.join(words)
+
+    def build_model(self, input_dim):
+        """构建RNN模型"""
+        model = Sequential([
+            Embedding(input_dim=input_dim, output_dim=128),
+            LSTM(128, dropout=0.2, recurrent_dropout=0.2),
+            Dense(64, activation='relu'),
+            Dense(1, activation='sigmoid')
+        ])
+
+        model.compile(
+            optimizer='adam',
+            loss='binary_crossentropy',
+            metrics=['accuracy']
+        )
+
+        return model
+
+    def train(self, texts, labels):
+        """训练模型"""
+        # 文本预处理
+        processed_texts = [self.preprocess_text(text) for text in texts]
+
+        # TF-IDF特征提取
+        self.vectorizer = TfidfVectorizer(
+            max_features=self.max_features,
+            stop_words=['的', '了', '是', '在']  # 中文停用词
+        )
+
+        tfidf_features = self.vectorizer.fit_transform(processed_texts)
+
+        # 转换为序列数据供RNN使用
+        feature_array = tfidf_features.toarray()
+
+        # 构建并训练模型
+        self.model = self.build_model(self.max_features)
+
+        X_train, X_test, y_train, y_test = train_test_split(
+            feature_array, labels, test_size=0.2, random_state=42
+        )
+
+        history = self.model.fit(
+            X_train, y_train,
+            batch_size=32,
+            epochs=10,
+            validation_data=(X_test, y_test),
+            verbose=1
+        )
+
+        # 保存模型
+        joblib.dump(self.vectorizer, 'models/tfidf_vectorizer.pkl')
+        self.model.save('models/rumor_detector.h5')
+
+        return history
+
+    def predict(self, text):
+        """预测谣言概率"""
+        if not self.model or not self.vectorizer:
+            # 加载已训练的模型
+            try:
+                self.vectorizer = joblib.load('models/tfidf_vectorizer.pkl')
+                self.model = tf.keras.models.load_model('models/rumor_detector.h5')
+            except:
+                return 0.5  # 默认概率
+
+        processed_text = self.preprocess_text(text)
+        features = self.vectorizer.transform([processed_text])
+        feature_array = features.toarray()
+
+        probability = self.model.predict(feature_array)[0][0]
+        return float(probability)

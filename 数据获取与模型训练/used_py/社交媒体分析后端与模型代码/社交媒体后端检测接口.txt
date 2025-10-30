@@ -1,0 +1,63 @@
+# detection_routes.py
+from flask import Blueprint, request, jsonify
+from ml_model.rumor_detector import RumorDetector
+import redis
+import json
+
+detection_bp = Blueprint('detection', __name__)
+detector = RumorDetector()
+
+# Redis缓存配置
+redis_client = redis.Redis(host='localhost', port=6379, db=0)
+
+@detection_bp.route('/predict_rumor', methods=['POST'])
+def predict_rumor():
+    try:
+        data = request.json
+        text = data.get('text', '')
+        replies = data.get('replies', [])
+        
+        if not text:
+            return jsonify({'error': '文本内容不能为空'}), 400
+        
+        # 检查缓存
+        cache_key = f"rumor_prediction:{hash(text)}"
+        cached_result = redis_client.get(cache_key)
+        
+        if cached_result:
+            return jsonify(json.loads(cached_result))
+        
+        # 构建完整文本（帖子+回复）
+        full_text = text
+        if replies:
+            # 按时间排序回复
+            sorted_replies = sorted(replies, key=lambda x: x.get('timestamp', ''))
+            reply_texts = [reply.get('text', '') for reply in sorted_replies]
+            full_text += ' ' + ' '.join(reply_texts)
+        
+        # 预测谣言概率
+        probability = detector.predict(full_text)
+        probability_percent = round(probability * 100, 2)
+        
+        result = {
+            'probability': probability_percent,
+            'risk_level': get_risk_level(probability_percent),
+            'text': text[:100] + '...' if len(text) > 100 else text
+        }
+        
+        # 缓存结果（5分钟过期）
+        redis_client.setex(cache_key, 300, json.dumps(result))
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': f'预测失败: {str(e)}'}), 500
+
+def get_risk_level(probability):
+    """根据概率确定风险等级"""
+    if probability >= 90:
+        return 'high'
+    elif probability >= 60:
+        return 'medium'
+    else:
+        return 'low'

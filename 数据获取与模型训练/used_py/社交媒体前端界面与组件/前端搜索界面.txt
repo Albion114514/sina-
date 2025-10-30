@@ -1,0 +1,432 @@
+<!-- SearchPanel.vue -->
+<template>
+  <div class="search-panel">
+    <h2>关键词搜索</h2>
+    
+    <div class="search-controls">
+      <!-- 词云展示 -->
+      <div class="wordcloud-section">
+        <h3>热点关键词词云</h3>
+        <div class="wordcloud-container">
+          <img 
+            :src="'data:image/png;base64,' + wordcloudImage" 
+            alt="关键词词云"
+            @load="wordcloudLoaded = true"
+            v-show="wordcloudLoaded"
+          />
+          <div v-if="!wordcloudLoaded" class="loading-wordcloud">
+            <i class="el-icon-loading"></i>
+            生成词云中...
+          </div>
+          <div class="wordcloud-hint">点击词云中的关键词进行筛选</div>
+        </div>
+        
+        <el-button 
+          type="primary" 
+          icon="el-icon-refresh" 
+          @click="refreshWordcloud"
+          :loading="refreshingWordcloud"
+        >
+          刷新词云
+        </el-button>
+      </div>
+      
+      <!-- 搜索控制 -->
+      <div class="search-controls-section">
+        <div class="search-input-group">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="输入关键词进行搜索..."
+            clearable
+            @clear="clearSearch"
+            @keyup.enter="handleSearch"
+          >
+            <template slot="prepend">关键词</template>
+            <el-button 
+              slot="append" 
+              icon="el-icon-search" 
+              @click="handleSearch"
+            >
+              搜索
+            </el-button>
+          </el-input>
+        </div>
+        
+        <div class="filter-controls">
+          <div class="filter-group">
+            <span class="filter-label">数据类型：</span>
+            <el-radio-group v-model="dataType" @change="handleFilterChange">
+              <el-radio-button label="all">全部</el-radio-button>
+              <el-radio-button label="processed">已处理</el-radio-button>
+              <el-radio-button label="unprocessed">未处理</el-radio-button>
+            </el-radio-group>
+          </div>
+          
+          <div class="filter-group">
+            <span class="filter-label">谣言概率过滤：</span>
+            <el-slider
+              v-model="probabilityThreshold"
+              :format-tooltip="formatProbability"
+              :max="100"
+              :step="1"
+              show-stops
+              show-input
+              @change="handleFilterChange"
+            ></el-slider>
+            <span class="threshold-value">{{ probabilityThreshold }}%</span>
+          </div>
+        </div>
+        
+        <div class="action-buttons">
+          <el-button 
+            type="warning" 
+            icon="el-icon-delete" 
+            @click="clearAllFilters"
+          >
+            清除筛选
+          </el-button>
+          
+          <el-button 
+            type="info" 
+            icon="el-icon-download" 
+            @click="exportResults"
+            :disabled="filteredData.length === 0"
+          >
+            导出结果
+          </el-button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 搜索结果 -->
+    <div class="search-results">
+      <h3>搜索结果 ({{ filteredData.length }} 条)</h3>
+      
+      <el-table 
+        :data="filteredData" 
+        :loading="searchLoading"
+        style="width: 100%"
+        empty-text="暂无数据"
+      >
+        <el-table-column prop="text" label="文本内容" min-width="300" show-overflow-tooltip>
+        </el-table-column>
+        
+        <el-table-column prop="nature" label="性质" width="100">
+          <template slot-scope="scope">
+            <el-tag 
+              v-if="scope.row.nature"
+              :type="scope.row.nature === 'rumor' ? 'danger' : 'success'"
+              size="small"
+            >
+              {{ scope.row.nature === 'rumor' ? '谣言' : '非谣言' }}
+            </el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="source_platform" label="来源" width="100">
+        </el-table-column>
+        
+        <el-table-column prop="rumor_probability" label="谣言概率" width="120">
+          <template slot-scope="scope">
+            <span v-if="scope.row.rumor_probability" 
+                  :class="getProbabilityClass(scope.row.rumor_probability)">
+              {{ scope.row.rumor_probability }}%
+            </span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="timestamp" label="发布时间" width="150">
+          <template slot-scope="scope">
+            {{ formatTime(scope.row.timestamp) }}
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="status" label="状态" width="100">
+          <template slot-scope="scope">
+            <el-tag 
+              :type="scope.row.status === 'processed' ? 'success' : 'warning'"
+              size="small"
+            >
+              {{ scope.row.status === 'processed' ? '已处理' : '未处理' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+    
+    <!-- 热门关键词 -->
+    <div class="hot-keywords" v-if="hotKeywords.length > 0">
+      <h3>热门关键词</h3>
+      <div class="keywords-tags">
+        <el-tag
+          v-for="keyword in hotKeywords"
+          :key="keyword.word"
+          class="keyword-tag"
+          :type="getRandomTagType()"
+          @click="handleKeywordClick(keyword.word)"
+        >
+          {{ keyword.word }} ({{ keyword.count }})
+        </el-tag>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'SearchPanel',
+  data() {
+    return {
+      wordcloudImage: '',
+      wordcloudLoaded: false,
+      refreshingWordcloud: false,
+      searchKeyword: '',
+      dataType: 'all',
+      probabilityThreshold: 50,
+      filteredData: [],
+      searchLoading: false,
+      hotKeywords: []
+    }
+  },
+  mounted() {
+    this.loadWordcloud()
+    this.loadHotKeywords()
+  },
+  methods: {
+    async loadWordcloud() {
+      try {
+        const response = await this.$http.get('/api/wordcloud')
+        this.wordcloudImage = response.data.image
+      } catch (error) {
+        console.error('加载词云失败:', error)
+        this.$message.error('加载词云失败')
+      }
+    },
+    
+    async loadHotKeywords() {
+      try {
+        const response = await this.$http.get('/api/hot-keywords')
+        this.hotKeywords = response.data.keywords
+      } catch (error) {
+        console.error('加载热门关键词失败:', error)
+      }
+    },
+    
+    async handleSearch() {
+      if (!this.searchKeyword.trim()) {
+        this.$message.warning('请输入搜索关键词')
+        return
+      }
+      
+      this.searchLoading = true
+      try {
+        const response = await this.$http.post('/api/filter-by-keyword', {
+          keyword: this.searchKeyword,
+          probability_threshold: this.probabilityThreshold,
+          type: this.dataType
+        })
+        
+        this.filteredData = response.data.data
+        this.$message.success(`找到 ${response.data.count} 条结果`)
+        
+      } catch (error) {
+        console.error('搜索失败:', error)
+        this.$message.error('搜索失败')
+      } finally {
+        this.searchLoading = false
+      }
+    },
+    
+    handleKeywordClick(keyword) {
+      this.searchKeyword = keyword
+      this.handleSearch()
+    },
+    
+    handleFilterChange() {
+      if (this.searchKeyword) {
+        this.handleSearch()
+      }
+    },
+    
+    clearSearch() {
+      this.searchKeyword = ''
+      this.filteredData = []
+    },
+    
+    clearAllFilters() {
+      this.searchKeyword = ''
+      this.dataType = 'all'
+      this.probabilityThreshold = 50
+      this.filteredData = []
+      this.$message.info('已清除所有筛选条件')
+    },
+    
+    async refreshWordcloud() {
+      this.refreshingWordcloud = true
+      try {
+        // 清除缓存并重新生成
+        await this.$http.delete('/api/wordcloud-cache') // 需要后端实现缓存清除接口
+        await this.loadWordcloud()
+        this.$message.success('词云已刷新')
+      } catch (error) {
+        console.error('刷新词云失败:', error)
+        this.$message.error('刷新词云失败')
+      } finally {
+        this.refreshingWordcloud = false
+      }
+    },
+    
+    exportResults() {
+      // 实现导出功能
+      const dataStr = JSON.stringify(this.filteredData, null, 2)
+      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr)
+      
+      const exportFileDefaultName = `谣言检测搜索结果_${new Date().toISOString().split('T')[0]}.json`
+      
+      const linkElement = document.createElement('a')
+      linkElement.setAttribute('href', dataUri)
+      linkElement.setAttribute('download', exportFileDefaultName)
+      linkElement.click()
+      
+      this.$message.success('导出成功')
+    },
+    
+    formatProbability(value) {
+      return `${value}%`
+    },
+    
+    getProbabilityClass(probability) {
+      if (probability >= 90) return 'high-risk'
+      if (probability >= 60) return 'medium-risk'
+      return 'low-risk'
+    },
+    
+    formatTime(timestamp) {
+      if (!timestamp) return ''
+      return new Date(timestamp).toLocaleString()
+    },
+    
+    getRandomTagType() {
+      const types = ['', 'success', 'info', 'warning', 'danger']
+      return types[Math.floor(Math.random() * types.length)]
+    }
+  }
+}
+</script>
+
+<style scoped>
+.search-panel {
+  padding: 20px;
+}
+
+.search-controls {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 30px;
+}
+
+.wordcloud-section {
+  flex: 1;
+  text-align: center;
+}
+
+.wordcloud-container {
+  border: 1px solid #eaeaea;
+  border-radius: 4px;
+  padding: 20px;
+  margin-bottom: 15px;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.wordcloud-container img {
+  max-width: 100%;
+  height: auto;
+}
+
+.loading-wordcloud {
+  color: #999;
+  font-size: 16px;
+}
+
+.wordcloud-hint {
+  margin-top: 10px;
+  color: #666;
+  font-size: 12px;
+}
+
+.search-controls-section {
+  flex: 2;
+}
+
+.search-input-group {
+  margin-bottom: 20px;
+}
+
+.filter-controls {
+  margin-bottom: 20px;
+}
+
+.filter-group {
+  margin-bottom: 15px;
+}
+
+.filter-label {
+  display: inline-block;
+  width: 120px;
+  font-weight: bold;
+}
+
+.threshold-value {
+  margin-left: 10px;
+  color: #409EFF;
+  font-weight: bold;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.search-results {
+  margin-bottom: 30px;
+}
+
+.hot-keywords {
+  margin-top: 30px;
+}
+
+.keywords-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.keyword-tag {
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.keyword-tag:hover {
+  transform: scale(1.05);
+}
+
+.high-risk {
+  color: #ff4d4f;
+  font-weight: bold;
+}
+
+.medium-risk {
+  color: #faad14;
+  font-weight: bold;
+}
+
+.low-risk {
+  color: #52c41a;
+}
+</style>

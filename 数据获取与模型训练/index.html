@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>谣言检测系统</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome 图标 -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- ECharts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.3.3/dist/echarts.min.js"></script>
+    <!-- Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- Handlebars -->
+    <script src="https://cdn.jsdelivr.net/npm/handlebars@4.7.7/dist/handlebars.min.js"></script>
+    <!-- 自定义样式 -->
+    <style>
+        .topic-card { 
+            cursor: pointer; 
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .topic-card:hover { 
+            transform: translateY(-5px); 
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .wordcloud-container { 
+            height: 400px; 
+            margin: 20px 0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .page-container {
+            min-height: calc(100vh - 56px - 60px);
+        }
+        .footer {
+            height: 60px;
+            line-height: 60px;
+            background-color: #f8f9fa;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            display: none;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        .keyword-badge {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .keyword-badge:hover {
+            transform: scale(1.05);
+        }
+        .weibo-item {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .weibo-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .prob-high { background-color: rgba(220, 53, 69, 0.1); }
+        .prob-medium { background-color: rgba(255, 193, 7, 0.1); }
+        .prob-low { background-color: rgba(40, 167, 69, 0.1); }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#" onclick="showPage('home')">
+                <i class="fa fa-shield mr-2"></i>谣言检测系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" onclick="showPage('home')">首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showPage('detection')">检测结果</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showPage('verification')">人工校验</a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                    <div class="input-group">
+                        <input type="text" id="search-input" class="form-control" placeholder="搜索关键词...">
+                        <button class="btn btn-outline-light" type="button" onclick="searchKeyword()">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 加载中遮罩 -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="container page-container py-4">
+        <!-- 首页 -->
+        <div id="home-page" class="page-content">
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <h2 class="mb-3">
+                        <i class="fa fa-list-alt mr-2"></i>当前主题列表
+                    </h2>
+                    <div class="row" id="topics-container">
+                        <!-- 主题卡片将通过JavaScript动态加载 -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-12">
+                    <h2 class="mb-3">
+                        <i class="fa fa-cloud mr-2"></i>热门关键词
+                    </h2>
+                    <div class="wordcloud-container" id="wordcloud"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主题详情页 -->
+        <div id="topic-detail-page" class="page-content d-none">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 id="topic-title">
+                    <i class="fa fa-tag mr-2"></i><span></span>
+                </h2>
+                <button class="btn btn-secondary" onclick="showPage('home')">
+                    <i class="fa fa-arrow-left mr-1"></i>返回
+                </button>
+            </div>
+
+            <div class="mb-4">
+                <h3 class="mb-2">
+                    <i class="fa fa-key mr-2"></i>相关关键字
+                </h3>
+                <div id="keywords-container" class="d-flex flex-wrap gap-2">
+                    <!-- 关键字标签将动态加载 -->
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3 class="mb-2">
+                        <i class="fa fa-comment mr-2"></i>微博列表
+                    </h3>
+                    <div class="d-flex gap-2">
+                        <select id="prob-filter" class="form-select">
+                            <option value="0">所有概率</option>
+                            <option value="50">≥50%</option>
+                            <option value="70">≥70%</option>
+                            <option value="90">≥90%</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="filterWeibo()">
+                            <i class="fa fa-filter mr-1"></i>筛选
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="weibo-list" class="list-group mt-3">
+                    <!-- 微博内容将动态加载 -->
+                </div>
+                
+                <div class="text-center mt-4">
+                    <button class="btn btn-outline-primary" id="load-more-weibo">
+                        <i class="fa fa-refresh mr-1"></i>加载更多
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 微博详情页 -->
+        <div id="weibo-detail-page" class="page-content d-none">
+            <button class="btn btn-secondary mb-4" onclick="showPage('topic-detail')">
+                <i class="fa fa-arrow-left mr-1"></i>返回
+            </button>
+            
+            <div class="card mb-4" id="weibo-card">
+                <!-- 微博内容将动态加载 -->
+            </div>
+
+            <div class="mb-4">
+                <h3 class="mb-2">
+                    <i class="fa fa-exclamation-triangle mr-2"></i>谣言检测结果
+                </h3>
+                <div class="card" id="detection-result">
+                    <!-- 检测结果将动态加载 -->
+                </div>
+            </div>
+
+            <div>
+                <h3 class="mb-2">
+                    <i class="fa fa-comments mr-2"></i>评论列表 
+                    <span class="badge bg-secondary" id="comments-count"></span>
+                </h3>
+                <div id="comments-list" class="list-group mt-3">
+                    <!-- 评论内容将动态加载 -->
+                </div>
+                
+                <div class="text-center mt-4">
+                    <button class="btn btn-outline-primary" id="load-more-comments">
+                        <i class="fa fa-refresh mr-1"></i>加载更多评论
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 检测结果页 -->
+        <div id="detection-page" class="page-content d-none">
+            <h2 class="mb-4">
+                <i class="fa fa-bar-chart mr-2"></i>检测结果统计
+            </h2>
+            
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card text-center">
+                        <div class="card-body bg-primary bg-opacity-10">
+                            <h5 class="card-title">总检测微博数</h5>
+                            <h2 class="display-4" id="total-weibo-count">0</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-center">
+                        <div class="card-body bg-danger bg-opacity-10">
+                            <h5 class="card-title">谣言数量</h5>
+                            <h2 class="display-4" id="rumor-count">0</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-center">
+                        <div class="card-body bg-success bg-opacity-10">
+                            <h5 class="card-title">非谣言数量</h5>
+                            <h2 class="display-4" id="non-rumor-count">0</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">谣言概率分布</h5>
+                            <div id="probability-chart" style="height: 300px;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">主题谣言比例</h5>
+                            <div id="topic-rumor-chart" style="height: 300px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">最近检测结果</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>微博内容</th>
+                                    <th>发布者</th>
+                                    <th>时间</th>
+                                    <th>谣言概率</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-detections">
+                                <!-- 最近检测结果将动态加载 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 人工校验页 -->
+        <div id="verification-page" class="page-content d-none">
+            <h2 class="mb-4">
+                <i class="fa fa-check-square-o mr-2"></i>人工校验
+            </h2>
+            
+            <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3 class="mb-2">待校验微博</h3>
+                    <div class="d-flex gap-2">
+                        <select id="verification-filter" class="form-select">
+                            <option value="all">所有主题</option>
+                            <!-- 主题选项将动态加载 -->
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="verification-list" class="list-group mt-3">
+                    <!-- 待校验微博将动态加载 -->
+                </div>
+                
+                <div class="text-center mt-4">
+                    <button class="btn btn-outline-primary" id="load-more-verification">
+                        <i class="fa fa-refresh mr-1"></i>加载更多
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 页脚 -->
+    <footer class="footer text-center">
+        <div class="container">
+            <span class="text-muted">© 2025 谣言检测系统 | 基于机器学习的微博谣言识别平台</span>
+        </div>
+    </footer>
+
+    <!-- 模板 -->
+    <script id="topic-card-template" type="text/x-handlebars-template">
+        {{#each topics}}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 topic-card" onclick="showTopicDetail({{id}})">
+                <div class="card-body">
+                    <h5 class="card-title">{{title}}</h5>
+                    <p class="card-text">包含 {{keyword_count}} 个关键字</p>
+                    <p class="card-text"><small class="text-muted">创建时间: {{formatDate create_time}}</small></p>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <small class="text-muted">点击查看详情</small>
+                </div>
+            </div>
+        </div>
+        {{/each}}
+    </script>
+
+    <script id="keyword-badge-template" type="text/x-handlebars-template">
+        {{#each keywords}}
+        <span class="badge bg-primary keyword-badge" onclick="selectKeyword({{id}}, '{{word}}')">
+            {{word}} ({{weibo_count}}条微博)
+        </span>
+        {{/each}}
+    </script>
+
+    <script id="weibo-item-template" type="text/x-handlebars-template">
+        {{#each weiboList}}
+        <div class="list-group-item weibo-item {{getProbClass rumor_prob}}" onclick="showWeiboDetail({{id}})">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">{{user_name}}</h5>
+                <small>{{formatDate timestamp}}</small>
+            </div>
+            <p class="mb-1">{{text}}</p>
+            <div class="d-flex justify-content-between align-items-center">
+                <small>
+                    <i class="fa fa-retweet mr-1"></i>{{reposts_count}} 
+                    <i class="fa fa-comment ml-2 mr-1"></i>{{comments_count}} 
+                    <i class="fa fa-thumbs-up ml-2 mr-1"></i>{{attitudes_count}}
+                </small>
+                <span class="badge {{getProbBadgeClass rumor_prob}}">
+                    谣言概率: {{rumor_prob}}%
+                </span>
+            </div>
+        </div>
+        {{/each}}
+    </script>
+
+    <script id="weibo-detail-template" type="text/x-handlebars-template">
+        <div class="card-header">
+            <div class="d-flex justify-content-between">
+                <h5 class="card-title mb-0">{{user_name}}</h5>
+                <small>{{formatDate timestamp}}</small>
+            </div>
+        </div>
+        <div class="card-body">
+            <p class="card-text">{{text}}</p>
+            {{#if pics}}
+            <div class="mt-3">
+                {{#each splitPics}}
+                <img src="{{this}}" class="img-thumbnail me-2 mb-2" style="max-width: 200px;" />
+                {{/each}}
+            </div>
+            {{/if}}
+        </div>
+        <div class="card-footer text-muted">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <i class="fa fa-retweet mr-1"></i>{{reposts_count}} 
+                    <i class="fa fa-comment ml-2 mr-1"></i>{{comments_count}} 
+                    <i class="fa fa-thumbs-up ml-2 mr-1"></i>{{attitudes_count}}
+                </div>
+                <div>
+                    来源: {{source}}
+                </div>
+            </div>
+        </div>
+    </script>
+
+    <script id="detection-result-template" type="text/x-handlebars-template">
+        <div class="card-body">
+            <h5 class="card-title">谣言检测结果</h5>
+            <p class="card-text">
+                模型预测概率: <span class="badge {{getProbBadgeClass rumor_prob}}">
+                    {{rumor_prob}}%
+                </span>
+            </p>
+            <p class="card-text">
+                预测结果: {{getRumorTypeText rumor_prob}}
+            </p>
+            {{#if is_processed}}
+            <div class="alert {{getProcessedAlertClass rumor_type}}">
+                已人工确认: {{getRumorTypeTextByType rumor_type}}
+                <br>处理时间: {{formatDate process_time}}
+            </div>
+            {{else}}
+            <div class="d-flex gap-2 mt-2">
+                <button class="btn btn-danger" onclick="submitVerification({{weibo_id}}, true)">
+                    <i class="fa fa-ban mr-1"></i>标记为谣言
+                </button>
+                <button class="btn btn-success" onclick="submitVerification({{weibo_id}}, false)">
+                    <i class="fa fa-check mr-1"></i>标记为非谣言
+                </button>
+            </div>
+            {{/if}}
+        </div>
+    </script>
+
+    <script id="comment-item-template" type="text/x-handlebars-template">
+        {{#each comments}}
+        <div class="list-group-item">
+            <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">{{user}}</h6>
+                <small>{{formatDate timestamp}}</small>
+            </div>
+            <p class="mb-1">{{content}}</p>
+        </div>
+        {{/each}}
+    </script>
+
+    <script id="recent-detection-template" type="text/x-handlebars-template">
+        {{#each detections}}
+        <tr>
+            <td>{{text}}</td>
+            <td>{{user_name}}</td>
+            <td>{{formatDate timestamp}}</td>
+            <td><span class="badge {{getProbBadgeClass rumor_prob}}">{{rumor_prob}}%</span></td>
+            <td>{{getStatusText is_processed rumor_type}}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary" onclick="showWeiboDetail({{id}})">
+                    <i class="fa fa-eye mr-1"></i>查看
+                </button>
+            </td>
+        </tr>
+        {{/each}}
+    </script>
+
+    <script id="verification-item-template" type="text/x-handlebars-template">
+        {{#each weiboList}}
+        <div class="list-group-item weibo-item" onclick="showWeiboDetail({{id}})">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">{{user_name}}</h5>
+                <small>{{formatDate timestamp}}</small>
+            </div>
+            <p class="mb-1">{{text}}</p>
+            <div class="d-flex justify-content-between align-items-center">
+                <small>主题: {{topic_title}}</small>
+                <span class="badge {{getProbBadgeClass rumor_prob}}">
+                    谣言概率: {{rumor_prob}}%
+                </span>
+            </div>
+        </div>
+        {{/each}}
+    </script>
+
+    <!-- JavaScript -->
+    <script>
+        // 全局变量
+        let currentPage = 'home';
+        let currentTopicId = null;
+        let currentKeywordId = null;
+        let currentWeiboId = null;
+        let weiboPage = 1;
+        let commentPage = 1;
+        let verificationPage = 1;
+        const pageSize = 10;
+        const commentPageSize = 20;
+        
+        // 模拟数据
+        const mockTopics = [
+            { id: 1, title: '疫情相关', keyword_count: 15, create_time: '2025-07-01T00:00:00' },
+            { id: 2, title: '食品安全', keyword_count: 12, create_time: '2025-07-02T00:00:00' },
+            { id: 3, title: '自然灾害', keyword_count: 8, create_time: '2025-07-03T00:00:00' },
+            { id: 4, title: '健康养生', keyword_count: 20, create_time: '2025-07-04T00:00:00' },
+            { id: 5, title: '科技发展', keyword_count: 10, create_time: '2025-07-05T00:00:00' },
+            { id: 6, title: '社会热点', keyword_count: 18, create_time: '2025-07-06T00:00:00' }
+        ];
+        
+        const mockKeywords = {
+            1: [
+                { id: 101, word: '新冠', weibo_count: 256 },
+                { id: 102, word: '疫苗', weibo_count: 189 },
+                { id: 103, word: '核酸检测', weibo_count: 145 },
+                { id: 104, word: '口罩', weibo_count: 98 },
+                { id: 105, word: '隔离', weibo_count: 76 }
+            ],
+            2: [
+                { id: 201, word: '转基因', weibo_count: 134 },
+                { id: 202, word: '添加剂', weibo_count: 112 },
+                { id: 203, word: '食品安全', weibo_count: 97 },
+                { id: 204, word: '有机食品', weibo_count: 85 }
+            ],
+            3: [
+                { id: 301, word: '地震', weibo_count: 178 },
+                { id: 302, word: '洪水', weibo_count: 123 },
+                { id: 303, word: '台风', weibo_count: 98 }
+            ],
+            4: [
+                { id: 401, word: '养生', weibo_count: 215 },
+                { id: 402, word: '保健品', weibo_count: 167 },
+                { id: 403, word: '中医', weibo_count: 143 },
+                { id: 404, word: '食疗', weibo_count: 128 },
+                { id: 405, word: '减肥', weibo_count: 198 }
+            ],
+            5: [
+                { id: 501, word: '人工智能', weibo_count: 156 },
+                { id: 502, word: '5G', weibo_count: 134 },
+                { id: 503, word: '区块链', weibo_count: 98 },
+                { id: 504, word: '元宇宙', weibo_count: 87 }
+            ],
+            6: [
+                { id: 601, word: '教育', weibo_count: 187 },
+                { id: 602, word: '房价', weibo_count: 203 },
+                { id: 603, word: '就业', weibo_count: 156 },
+                { id: 604, word: '环保', weibo_count: 124 }
+            ]
+        };
+        
+        const mockWeibo = {
+            101: [
+                { 
+                    id: 1001, 
+                    user_name: '健康科普达人', 
+                    text: '新冠病毒变异速度加快，最新研究表明现有疫苗对新变种的保护率下降了30%，建议大家加强防护措施。', 
+                    timestamp: '2025-07-10T10:30:00',
+                    reposts_count: 125,
+                    comments_count: 48,
+                    attitudes_count: 215,
+                    source: '微博客户端',
+                    pics: 'https://example.com/images/covid1.jpg,https://example.com/images/covid2.jpg',
+                    rumor_prob: 25
+                },
+                { 
+                    id: 1002, 
+                    user_name: '网络传言', 
+                    text: '紧急通知：新冠病毒可以通过空气传播，即使没有接触也可能感染。请大家尽量不要出门，在家隔离。', 
+                    timestamp: '2025-07-10T14:20:00',
+                    reposts_count: 342,
+                    comments_count: 156,
+                    attitudes_count: 87,
+                    source: '微博国际版',
+                    pics: '',
+                    rumor_prob: 85
+                },
+                { 
+                    id: 1003, 
+                    user_name: '医学专家', 
+                    text: '根据最新临床数据，新冠病毒主要通过飞沫传播，空气传播的风险较低。正确佩戴口罩和保持社交距离是有效的防护措施。', 
+                    timestamp: '2025-07-10T16:45:00',
+                    reposts_count: 218,
+                    comments_count: 76,
+                    attitudes_count: 324,
+                    source: '微博专业版',
+                    pics: 'https://example.com/images/doctor.jpg',
+                    rumor_prob: 15
+                }
+            ],
+            102: [
+                { 
+                    id: 1004, 
+                    user_name: '疫苗资讯', 
+                    text: '新研发的mRNA疫苗已完成临床试验，有效率达到95%以上，预计下个月开始大规模接种。', 
+                    timestamp: '2025-07-11T09:15:00',
+                    reposts_count: 187,
+                    comments_count: 65,
+                    attitudes_count: 243,
+                    source: '微博客户端',
+                    pics: 'https://example.com/images/vaccine1.jpg',
+                    rumor_prob: 30
+                },
+                { 
+                    id: 1005, 
+                    user_name: '谣言制造者', 
+                    text: '警惕！新冠疫苗会改变人类DNA，接种后可能导致不孕不育。已有多人出现严重副作用。', 
+                    timestamp: '2025-07-11T11:30:00',
+                    reposts_count: 421,
+                    comments_count: 215,
+                    attitudes_count: 98,
+                    source: '微博国际版',
+                    pics: '',
+                    rumor_prob: 95
+                }
+            ]
+        };
+        
+        const mockWeiboDetail = {
+            1002: {
+                id: 1002,
+                user_name: '网络传言',
+                text: '紧急通知：新冠病毒可以通过空气传播，即使没有接触也可能感染。请大家尽量不要出门，在家隔离。',
+                timestamp: '2025-07-10T14:20:00',
+                reposts_count: 342,
+                comments_count: 156,
+                attitudes_count: 87,
+                source: '微博国际版',
+                pics: '',
+                rumor_prob: 85
+            }
+        };
+        
+        const mockDetectionResult = {
+            1002: {
+                weibo_id: 1002,
+                rumor_prob: 85,
+                is_processed: false,
+                rumor_type: null,
+                process_time: null
+            }
+        };
+        
+        const mockComments = {
+            1002: [
+                { user: '用户1', content: '真的假的？好可怕！', timestamp: '2025-07-10T14:25:00' },
+                { user: '用户2', content: '这是谣言吧，官方都没说', timestamp: '2025-07-10T14:30:00' },
+                { user: '用户3', content: '我觉得还是小心为妙，宁可信其有', timestamp: '2025-07-10T14:35:00' },
+                { user: '用户4', content: '已经举报了，传播谣言太可恶', timestamp: '2025-07-10T14:40:00' },
+                { user: '用户5', content: '求官方辟谣！', timestamp: '2025-07-10T14:45:00' }
+            ]
+        };
+        
+        const mockWordCloudData = [
+            { word: '新冠', count: 256 },
+            { word: '疫苗', count: 189 },
+            { word: '养生', count: 215 },
+            { word: '房价', count: 203 },
+            { word: '人工智能', count: 156 },
+            { word: '地震', count: 178 },
+            { word: '减肥', count: 198 },
+            { word: '转基因', count: 134 },
+            { word: '教育', count: 187 },
+            { word: '就业', count: 156 },
+            { word: '5G', count: 134 },
+            { word: '区块链', count: 98 },
+            { word: '口罩', count: 98 },
+            { word: '环保', count: 124 },
+            { word: '中医', count: 143 }
+        ];
+        
+        const mockDetectionStats = {
+            total_weibo_count: 1256,
+            rumor_count: 342,
+            non_rumor_count: 914,
+            probability_distribution: [120, 180, 250, 310, 240, 156],
+            topic_rumor_ratio: [
+                { name: '疫情相关', value: 35 },
+                { name: '食品安全', value: 28 },
+                { name: '自然灾害', value: 15 },
+                { name: '健康养生', value: 42 },
+                { name: '科技发展', value: 20 },
+                { name: '社会热点', value: 30 }
+            ]
+        };
+        
+        const mockRecentDetections = [
+            {
+                id: 1001,
+                text: '新冠病毒变异速度加快，最新研究表明现有疫苗对新变种的保护率下降了30%',
+                user_name: '健康科普达人',
+                timestamp: '2025-07-10T10:30:00',
+                rumor_prob: 25,
+                is_processed: true,
+                rumor_type: 'non-rumor'
+            },
+            {
+                id: 1002,
+                text: '紧急通知：新冠病毒可以通过空气传播，即使没有接触也可能感染',
+                user_name: '网络传言',
+                timestamp: '2025-07-10T14:20:00',
+                rumor_prob: 85,
+                is_processed: false,
+                rumor_type: null
+            },
+            {
+                id: 1003,
+                text: '根据最新临床数据，新冠病毒主要通过飞沫传播，空气传播的风险较低',
+                user_name: '医学专家',
+                timestamp: '2025-07-10T16:45:00',
+                rumor_prob: 15,
+                is_processed: true,
+                rumor_type: 'non-rumor'
+            },
+            {
+                id: 1004,
+                text: '新研发的mRNA疫苗已完成临床试验，有效率达到95%以上',
+                user_name: '疫苗资讯',
+                timestamp: '2025-07-11T09:15:00',
+                rumor_prob: 30,
+                is_processed: true,
+                rumor_type: 'non-rumor'
+            },
+            {
+                id: 1005,
+                text: '警惕！新冠疫苗会改变人类DNA，接种后可能导致不孕不育',
+                user_name: '谣言制造者',
+                timestamp: '2025-07-11T11:30:00',
+                rumor_prob: 95,
+                is_processed: true,
+                rumor_type: 'rumor'
+            }
+        ];
+        
+        const mockVerificationList = [
+            {
+                id: 1006,
+                user_name: '养生达人',
+                text: '每天喝8杯水会导致水中毒，专家建议根据个人情况适量饮水',
+                timestamp: '2025-07-12T08:45:00',
+                rumor_prob: 65,
+                topic_title: '健康养生'
+            },
+            {
+                id: 1007,
+                user_name: '科技迷',
+                text: '5G信号塔会释放辐射，对人体健康有害，建议远离',
+                timestamp: '2025-07-12T10:20:00',
+                rumor_prob: 78,
+                topic_title: '科技发展'
+            },
+            {
+                id: 1008,
+                user_name: '环保志愿者',
+                text: '一次性筷子会导致森林砍伐，建议使用可重复使用的餐具',
+                timestamp: '2025-07-12T11:30:00',
+                rumor_prob: 45,
+                topic_title: '环保'
+            }
+        ];
+
+        // Handlebars 辅助函数
+        Handlebars.registerHelper('formatDate', function(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        });
+        
+        Handlebars.registerHelper('getProbClass', function(prob) {
+            if (prob >= 90) return 'prob-high';
+            if (prob >= 50) return 'prob-medium';
+            return 'prob-low';
+        });
+        
+        Handlebars.registerHelper('getProbBadgeClass', function(prob) {
+            if (prob >= 70) return 'bg-danger';
+            if (prob >= 50) return 'bg-warning';
+            return 'bg-success';
+        });
+        
+        Handlebars.registerHelper('splitPics', function(pics) {
+            return pics ? pics.split(',') : [];
+        });
+        
+        Handlebars.registerHelper('getRumorTypeText', function(prob) {
+            return prob >= 50 ? '谣言' : '非谣言';
+        });
+        
+        Handlebars.registerHelper('getRumorTypeTextByType', function(type) {
+            return type === 'rumor' ? '谣言' : '非谣言';
+        });
+        
+        Handlebars.registerHelper('getProcessedAlertClass', function(type) {
+            return type === 'rumor' ? 'alert-danger' : 'alert-success';
+        });
+        
+        Handlebars.registerHelper('getStatusText', function(isProcessed, type) {
+            if (!isProcessed) return '<span class="badge bg-warning">待处理</span>';
+            return type === 'rumor' ? '<span class="badge bg-danger">已确认谣言</span>' : '<span class="badge bg-success">已确认非谣言</span>';
+        });
+
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化首页
+            initHomePage();
+            
+            // 绑定事件
+            document.getElementById('load-more-weibo').addEventListener('click', loadMoreWeibo);
+            document.getElementById('load-more-comments').addEventListener('click', loadMoreComments);
+            document.getElementById('load-more-verification').addEventListener('click', loadMoreVerification);
+        });
+
+        // 显示指定页面
+        function showPage(pageName) {
+            // 隐藏所有页面
+            document.querySelectorAll('.page-content').forEach(page => {
+                page.classList.add('d-none');
+            });
+            
+            // 显示指定页面
+            document.getElementById(pageName + '-page').classList.remove('d-none');
+            
+            // 更新当前页面
+            currentPage = pageName;
+            
+            // 根据页面执行初始化
+            if (pageName === 'detection') {
+                initDetectionPage();
+            } else if (pageName === 'verification') {
+                initVerificationPage();
+            }
+        }
+
+        // 初始化首页
+        function initHomePage() {
+            showLoading();
+            
+            // 加载主题列表
+            loadTopics();
+            
+            // 加载词云
+            loadWordCloud();
+            
+            hideLoading();
+        }
+
+        // 加载主题列表
+        function loadTopics() {
+            const template = Handlebars.compile(document.getElementById('topic-card-template').innerHTML);
+            const html = template({ topics: mockTopics });
+            document.getElementById('topics-container').innerHTML = html;
+        }
+
+        // 加载词云
+        function loadWordCloud() {
+            const chart = echarts.init(document.getElementById('wordcloud'));
+            
+            const option = {
+                series: [{
+                    type: 'wordCloud',
+                    sizeRange: [12, 60],
+                    textRotation: [0, 45, 90, -45],
+                    textPadding: 0,
+                    autoSize: {
+                        enable: true,
+                        minSize: 12
+                    },
+                    data: mockWordCloudData.map(item => ({
+                        name: item.word,
+                        value: item.count,
+                        itemStyle: {
+                            color: `rgb(${Math.random() * 150 + 50}, ${Math.random() * 150 + 50}, ${Math.random() * 150 + 50})`
+                        }
+                    }))
+                }]
+            };
+            
+            chart.setOption(option);
+            
+            // 词云点击事件
+            chart.on('click', function(params) {
+                const keyword = params.name;
+                searchKeyword(keyword);
+            });
+        }
+
+        // 显示主题详情
+        function showTopicDetail(topicId) {
+            showLoading();
+            
+            currentTopicId = topicId;
+            currentKeywordId = null;
+            weiboPage = 1;
+            
+            // 更新页面标题
+            const topic = mockTopics.find(t => t.id === topicId);
+            document.querySelector('#topic-title span').textContent = topic.title;
+            
+            // 加载关键字
+            loadKeywords(topicId);
+            
+            // 显示主题详情页
+            showPage('topic-detail');
+            
+            hideLoading();
+        }
+
+        // 加载关键字
+        function loadKeywords(topicId) {
+            const keywords = mockKeywords[topicId] || [];
+            
+            const template = Handlebars.compile(document.getElementById('keyword-badge-template').innerHTML);
+            const html = template({ keywords: keywords });
+            document.getElementById('keywords-container').innerHTML = html;
+            
+            // 默认选择第一个关键字
+            if (keywords.length > 0) {
+                selectKeyword(keywords[0].id, keywords[0].word);
+            }
+        }
+
+        // 选择关键字
+        function selectKeyword(keywordId, keyword) {
+            currentKeywordId = keywordId;
+            weiboPage = 1;
+            
+            // 更新关键字样式
+            document.querySelectorAll('#keywords-container .badge').forEach(el => {
+                el.classList.remove('bg-success');
+                el.classList.add('bg-primary');
+            });
+            
+            const selectedBadge = Array.from(document.querySelectorAll('#keywords-container .badge')).find(
+                el => el.textContent.includes(keyword)
+            );
+            
+            if (selectedBadge) {
+                selectedBadge.classList.remove('bg-primary');
+                selectedBadge.classList.add('bg-success');
+            }
+            
+            // 加载微博数据
+            loadWeiboData();
+        }
+
+        // 加载微博数据
+        function loadWeiboData(append = false) {
+            showLoading();
+            
+            // 获取筛选条件
+            const minProb = document.getElementById('prob-filter').value;
+            
+            // 模拟获取微博数据
+            let weiboList = mockWeibo[currentKeywordId] || [];
+            
+            // 应用概率筛选
+            if (minProb > 0) {
+                weiboList = weiboList.filter(weibo => weibo.rumor_prob >= minProb);
+            }
+            
+            // 渲染微博列表
+            const template = Handlebars.compile(document.getElementById('weibo-item-template').innerHTML);
+            const html = template({ weiboList: weiboList });
+            
+            if (append) {
+                document.getElementById('weibo-list').innerHTML += html;
+            } else {
+                document.getElementById('weibo-list').innerHTML = html;
+            }
+            
+            // 控制加载更多按钮显示
+            const hasMore = weiboPage * pageSize < weiboList.length;
+            document.getElementById('load-more-weibo').style.display = hasMore ? 'inline-block' : 'none';
+            
+            hideLoading();
+        }
+
+        // 加载更多微博
+        function loadMoreWeibo() {
+            weiboPage++;
+            loadWeiboData(true);
+        }
+
+        // 筛选微博
+        function filterWeibo() {
+            weiboPage = 1;
+            loadWeiboData();
+        }
+
+        // 显示微博详情
+        function showWeiboDetail(weiboId) {
+            showLoading();
+            
+            currentWeiboId = weiboId;
+            commentPage = 1;
+            
+            // 加载微博详情
+            loadWeiboDetail(weiboId);
+            
+            // 加载检测结果
+            loadDetectionResult(weiboId);
+            
+            // 加载评论
+            loadComments(weiboId);
+            
+            // 显示微博详情页
+            showPage('weibo-detail');
+            
+            hideLoading();
+        }
+
+        // 加载微博详情
+        function loadWeiboDetail(weiboId) {
+            const weibo = mockWeiboDetail[weiboId] || {};
+            
+            const template = Handlebars.compile(document.getElementById('weibo-detail-template').innerHTML);
+            const html = template(weibo);
+            document.getElementById('weibo-card').innerHTML = html;
+        }
+
+        // 加载检测结果
+        function loadDetectionResult(weiboId) {
+            const result = mockDetectionResult[weiboId] || {
+                weibo_id: weiboId,
+                rumor_prob: 50,
+                is_processed: false,
+                rumor_type: null,
+                process_time: null
+            };
+            
+            const template = Handlebars.compile(document.getElementById('detection-result-template').innerHTML);
+            const html = template(result);
+            document.getElementById('detection-result').innerHTML = html;
+        }
+
+        // 加载评论
+        function loadComments(weiboId, append = false) {
+            const comments = mockComments[weiboId] || [];
+            
+            // 更新评论计数
+            document.getElementById('comments-count').textContent = comments.length;
+            
+            // 渲染评论列表
+            const template = Handlebars.compile(document.getElementById('comment-item-template').innerHTML);
+            const html = template({ comments: comments });
+            
+            if (append) {
+                document.getElementById('comments-list').innerHTML += html;
+            } else {
+                document.getElementById('comments-list').innerHTML = html;
+            }
+            
+            // 控制加载更多按钮显示
+            const hasMore = commentPage * commentPageSize < comments.length;
+            document.getElementById('load-more-comments').style.display = hasMore ? 'inline-block' : 'none';
+        }
+
+        // 加载更多评论
+        function loadMoreComments() {
+            commentPage++;
+            loadComments(currentWeiboId, true);
+        }
+
+        // 提交人工校验结果
+        function submitVerification(weiboId, isRumor) {
+            if (!confirm(`确定要标记为${isRumor ? '谣言' : '非谣言'}吗？`)) {
+                return;
+            }
+            
+            showLoading();
+            
+            // 模拟提交
+            setTimeout(() => {
+                // 更新检测结果
+                mockDetectionResult[weiboId] = {
+                    weibo_id: weiboId,
+                    rumor_prob: mockDetectionResult[weiboId].rumor_prob,
+                    is_processed: true,
+                    rumor_type: isRumor ? 'rumor' : 'non-rumor',
+                    process_time: new Date().toISOString()
+                };
+                
+                // 重新加载检测结果
+                loadDetectionResult(weiboId);
+                
+                alert('标记成功');
+                hideLoading();
+            }, 1000);
+        }
+
+        // 初始化检测结果页
+        function initDetectionPage() {
+            showLoading();
+            
+            // 更新统计数据
+            document.getElementById('total-weibo-count').textContent = mockDetectionStats.total_weibo_count;
+            document.getElementById('rumor-count').textContent = mockDetectionStats.rumor_count;
+            document.getElementById('non-rumor-count').textContent = mockDetectionStats.non_rumor_count;
+            
+            // 渲染概率分布图表
+            renderProbabilityChart();
+            
+            // 渲染主题谣言比例图表
+            renderTopicRumorChart();
+            
+            // 渲染最近检测结果
+            renderRecentDetections();
+            
+            hideLoading();
+        }
+
+        // 渲染概率分布图表
+        function renderProbabilityChart() {
+            const chart = echarts.init(document.getElementById('probability-chart'));
+            
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'shadow'
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: ['0-20%', '20-40%', '40-60%', '60-80%', '80-100%']
+                },
+                yAxis: {
+                    type: 'value'
+                },
+                series: [
+                    {
+                        name: '微博数量',
+                        type: 'bar',
+                        data: mockDetectionStats.probability_distribution,
+                        itemStyle: {
+                            color: function(params) {
+                                const colorList = ['#28a745', '#17a2b8', '#ffc107', '#fd7e14', '#dc3545'];
+                                return colorList[params.dataIndex];
+                            }
+                        }
+                    }
+                ]
+            };
+            
+            chart.setOption(option);
+        }
+
+        // 渲染主题谣言比例图表
+        function renderTopicRumorChart() {
+            const chart = echarts.init(document.getElementById('topic-rumor-chart'));
+            
+            const option = {
+                tooltip: {
+                    trigger: 'item'
+                },
+                legend: {
+                    orient: 'vertical',
+                    right: 10,
+                    top: 'center'
+                },
+                series: [
+                    {
+                        name: '谣言比例',
+                        type: 'pie',
+                        radius: ['50%', '70%'],
+                        avoidLabelOverlap: false,
+                        itemStyle: {
+                            borderRadius: 10,
+                            borderColor: '#fff',
+                            borderWidth: 2
+                        },
+                        label: {
+                            show: false,
+                            position: 'center'
+                        },
+                        emphasis: {
+                            label: {
+                                show: true,
+                                fontSize: '18',
+                                fontWeight: 'bold'
+                            }
+                        },
+                        labelLine: {
+                            show: false
+                        },
+                        data: mockDetectionStats.topic_rumor_ratio.map(item => ({
+                            name: item.name,
+                            value: item.value,
+                            itemStyle: {
+                                color: `rgb(${Math.random() * 150 + 50}, ${Math.random() * 150 + 50}, ${Math.random() * 150 + 50})`
+                            }
+                        }))
+                    }
+                ]
+            };
+            
+            chart.setOption(option);
+        }
+
+        // 渲染最近检测结果
+        function renderRecentDetections() {
+            const template = Handlebars.compile(document.getElementById('recent-detection-template').innerHTML);
+            const html = template({ detections: mockRecentDetections });
+            document.getElementById('recent-detections').innerHTML = html;
+        }
+
+        // 初始化人工校验页
+        function initVerificationPage() {
+            showLoading();
+            
+            // 加载主题筛选
+            loadTopicFilter();
+            
+            // 加载待校验微博
+            loadVerificationList();
+            
+            hideLoading();
+        }
+
+        // 加载主题筛选
+        function loadTopicFilter() {
+            const select = document.getElementById('verification-filter');
+            
+            // 清空现有选项
+            select.innerHTML = '<option value="all">所有主题</option>';
+            
+            // 添加主题选项
+            mockTopics.forEach(topic => {
+                const option = document.createElement('option');
+                option.value = topic.id;
+                option.textContent = topic.title;
+                select.appendChild(option);
+            });
+        }
+
+        // 加载待校验微博
+        function loadVerificationList(append = false) {
+            const topicFilter = document.getElementById('verification-filter').value;
+            
+            // 模拟获取待校验微博
+            let weiboList = mockVerificationList;
+            
+            // 应用主题筛选
+            if (topicFilter !== 'all') {
+                weiboList = weiboList.filter(weibo => weibo.topic_title === mockTopics.find(t => t.id === parseInt(topicFilter)).title);
+            }
+            
+            // 渲染待校验微博列表
+            const template = Handlebars.compile(document.getElementById('verification-item-template').innerHTML);
+            const html = template({ weiboList: weiboList });
+            
+            if (append) {
+                document.getElementById('verification-list').innerHTML += html;
+            } else {
+                document.getElementById('verification-list').innerHTML = html;
+            }
+            
+            // 控制加载更多按钮显示
+            const hasMore = verificationPage * pageSize < weiboList.length;
+            document.getElementById('load-more-verification').style.display = hasMore ? 'inline-block' : 'none';
+        }
+
+        // 加载更多待校验微博
+        function loadMoreVerification() {
+            verificationPage++;
+            loadVerificationList(true);
+        }
+
+        // 搜索关键字
+        function searchKeyword(keyword) {
+            keyword = keyword || document.getElementById('search-input').value;
+            
+            if (!keyword) {
+                alert('请输入搜索关键词');
+                return;
+            }
+            
+            showLoading();
+            
+            // 查找包含该关键字的主题
+            let found = false;
+            
+            for (const topicId in mockKeywords) {
+                const keywords = mockKeywords[topicId];
+                const foundKeyword = keywords.find(k => k.word.includes(keyword));
+                
+                if (foundKeyword) {
+                    // 显示主题详情
+                    showTopicDetail(parseInt(topicId));
+                    
+                    // 选择关键字
+                    setTimeout(() => {
+                        selectKeyword(foundKeyword.id, foundKeyword.word);
+                        hideLoading();
+                    }, 100);
+                    
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                alert('未找到相关关键字');
+                hideLoading();
+            }
+        }
+
+        // 显示加载中
+        function showLoading() {
+            document.getElementById('loading-overlay').style.display = 'flex';
+        }
+
+        // 隐藏加载中
+        function hideLoading() {
+            document.getElementById('loading-overlay').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

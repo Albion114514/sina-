@@ -1,0 +1,28 @@
+{
+  "keywords": ["敖瑞鹏这次录跑男跑不了了", "敖瑞鹏跑男", "敖瑞鹏跑男跑不了了", "敖瑞鹏这次录跑男录不了了"],
+  "startPage": 1,
+  "maxPage": 10,
+  "crawl_comments": true,
+  "max_comment_pages": 3,
+  "headers": {
+    "Connection": "close",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    "Cookie": "SINAGLOBAL=7939307579970.84.1741352727484; UOR=,,cn.bing.com; SCF=AkQX-bphvJgd_kQ_zWYgVuhNvaghFo6ha5dKGaQakI3Y4YSZJV9FINCYgaculxfqhJ3RhGYWyDfYgGE4UNLb3GQ.; ALF=1763889001; SUB=_2A25F_zI5DeRhGeFH7loW8i7LzT2IHXVndcvxrDV8PUJbkNANLXfakW1NevAY-UuZqsl6Ms23qHm6_ZqwDxpDMzdU; SUBP=0033WrSXqPxfM725Ws9jqgMF55529P9D9WFw8TCVAWZrbp2WHDf0EkO05JpX5KMhUgL.FoM4SKnNeo5NSo22dJLoIp7LxKML1KBLBKnLxKqL1hnLBoMN1K-RS0z7S0qp; _s_tentry=-; Apache=5459916401965.692.1761297003001; ULV=1761297003003:9:4:2:5459916401965.692.1761297003001:1760920148696"
+  },
+  "proxies": {},
+  "mysql_config": {
+    "host": "localhost",
+    "port": 3307,
+    "user": "root",
+    "password": "114514",
+    "database": "weibo_analysis2_0",
+    "charset": "utf8mb4",
+    "use_unicode": true  
+  },
+  "crawler_settings": {
+    "request_delay": [10, 15],
+    "timeout": 20,
+    "max_retries": 3,
+    "content_summary_length": 50
+  }
+}

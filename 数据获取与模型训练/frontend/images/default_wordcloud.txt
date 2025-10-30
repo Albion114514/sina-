@@ -1,0 +1,5 @@
+This is a placeholder for the wordcloud image.
+In a real application, this would be a proper PNG or SVG file.
+The frontend will request the actual wordcloud image from the backend API.
+
+For development purposes, you can replace this with a real image file named default_wordcloud.png.

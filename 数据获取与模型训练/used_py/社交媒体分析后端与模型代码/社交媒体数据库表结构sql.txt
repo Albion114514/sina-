@@ -1,0 +1,36 @@
+-- 创建数据库和表
+CREATE DATABASE rumor_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+USE rumor_db;
+
+-- 谣言数据表
+CREATE TABLE rumor_data (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    text TEXT NOT NULL,
+    image VARCHAR(500),
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    source_platform VARCHAR(50),
+    post_id VARCHAR(100) UNIQUE,
+    status ENUM('unprocessed', 'processed') DEFAULT 'unprocessed',
+    rumor_probability DECIMAL(5,2),
+    nature ENUM('rumor', 'non-rumor'),
+    process_time DATETIME,
+    processor VARCHAR(50)
+);
+
+-- 处理日志表
+CREATE TABLE process_log (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    data_id INT,
+    operation ENUM('verify', 'modify'),
+    old_nature ENUM('rumor', 'non-rumor'),
+    new_nature ENUM('rumor', 'non-rumor'),
+    operator VARCHAR(50),
+    operation_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (data_id) REFERENCES rumor_data(id)
+);
+
+-- 创建索引
+CREATE INDEX idx_timestamp ON rumor_data(timestamp);
+CREATE INDEX idx_status ON rumor_data(status);
+CREATE INDEX idx_nature ON rumor_data(nature);

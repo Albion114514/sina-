@@ -1,0 +1,140 @@
+<!-- VerificationPanel.vue -->
+<template>
+  <div class="verification-panel">
+    <el-tabs v-model="activeTab" @tab-click="handleTabClick">
+      <!-- 未处理标签页 -->
+      <el-tab-pane label="未处理文本" name="unprocessed">
+        <processed-table 
+          :data="unprocessedData"
+          :loading="loading"
+          type="unprocessed"
+          @refresh="loadUnprocessedData"
+          @process="handleProcess"
+        />
+      </el-tab-pane>
+      
+      <!-- 已处理标签页 -->
+      <el-tab-pane label="已处理文本" name="processed">
+        <processed-table 
+          :data="processedData"
+          :loading="loading"
+          type="processed"
+          @refresh="loadProcessedData"
+          @modify="handleModify"
+        />
+      </el-tab-pane>
+    </el-tabs>
+    
+    <!-- 处理弹窗 -->
+    <verification-dialog 
+      :visible="dialogVisible"
+      :current-item="currentItem"
+      :operation-type="operationType"
+      @confirm="handleConfirm"
+      @cancel="dialogVisible = false"
+    />
+  </div>
+</template>
+
+<script>
+import ProcessedTable from './components/ProcessedTable.vue'
+import VerificationDialog from './components/VerificationDialog.vue'
+
+export default {
+  name: 'VerificationPanel',
+  components: {
+    ProcessedTable,
+    VerificationDialog
+  },
+  data() {
+    return {
+      activeTab: 'unprocessed',
+      unprocessedData: [],
+      processedData: [],
+      loading: false,
+      dialogVisible: false,
+      currentItem: null,
+      operationType: 'process' // 'process' or 'modify'
+    }
+  },
+  mounted() {
+    this.loadUnprocessedData()
+  },
+  methods: {
+    handleTabClick(tab) {
+      if (tab.name === 'unprocessed') {
+        this.loadUnprocessedData()
+      } else {
+        this.loadProcessedData()
+      }
+    },
+    
+    async loadUnprocessedData() {
+      this.loading = true
+      try {
+        const response = await this.$http.get('/api/unprocessed-data')
+        this.unprocessedData = response.data.data
+      } catch (error) {
+        console.error('加载未处理数据失败:', error)
+        this.$message.error('加载失败')
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    async loadProcessedData() {
+      this.loading = true
+      try {
+        const response = await this.$http.get('/api/processed-data')
+        this.processedData = response.data.data
+      } catch (error) {
+        console.error('加载已处理数据失败:', error)
+        this.$message.error('加载失败')
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    handleProcess(item) {
+      this.currentItem = item
+      this.operationType = 'process'
+      this.dialogVisible = true
+    },
+    
+    handleModify(item) {
+      this.currentItem = item
+      this.operationType = 'modify'
+      this.dialogVisible = true
+    },
+    
+    async handleConfirm(result) {
+      try {
+        const url = this.operationType === 'process' ? '/api/verify-rumor' : '/api/modify-verification'
+        
+        await this.$http.post(url, {
+          id: this.currentItem.id,
+          nature: result.nature,
+          processor: 'current_user' // 实际应用中应从用户系统获取
+        })
+        
+        this.$message.success(
+          this.operationType === 'process' ? '处理成功' : '修改成功'
+        )
+        
+        this.dialogVisible = false
+        
+        // 刷新数据
+        if (this.activeTab === 'unprocessed') {
+          this.loadUnprocessedData()
+        } else {
+          this.loadProcessedData()
+        }
+        
+      } catch (error) {
+        console.error('操作失败:', error)
+        this.$message.error('操作失败')
+      }
+    }
+  }
+}
+</script>

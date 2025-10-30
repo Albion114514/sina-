@@ -1,0 +1,146 @@
+<!-- DataDisplay.vue -->
+<template>
+  <div class="data-display">
+    <h2>社交媒体数据展示</h2>
+    
+    <!-- 数据列表 -->
+    <div class="data-list" v-infinite-scroll="loadMore" infinite-scroll-disabled="busy">
+      <div v-for="item in dataList" :key="item.id" class="data-item">
+        <div class="content-preview">
+          <p class="text">{{ truncateText(item.text, 50) }}</p>
+          <div class="meta">
+            <span class="time">{{ formatTime(item.timestamp) }}</span>
+            <span class="source">{{ item.source_platform }}</span>
+          </div>
+        </div>
+        <el-button size="small" @click="showDetail(item)">详情</el-button>
+        <el-button type="primary" size="small" @click="detectRumor(item)">检测</el-button>
+      </div>
+      
+      <div v-if="loading" class="loading">加载中...</div>
+      <div v-if="noMore" class="no-more">没有更多数据了</div>
+    </div>
+    
+    <!-- 详情弹窗 -->
+    <el-dialog :title="currentItem ? '数据详情' : ''" :visible.sync="detailVisible">
+      <div v-if="currentItem" class="detail-content">
+        <p><strong>完整文本：</strong>{{ currentItem.text }}</p>
+        <p><strong>发布时间：</strong>{{ formatTime(currentItem.timestamp) }}</p>
+        <p><strong>来源平台：</strong>{{ currentItem.source_platform }}</p>
+        <img v-if="currentItem.image" :src="currentItem.image" alt="图片" class="detail-image">
+      </div>
+    </el-dialog>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'DataDisplay',
+  data() {
+    return {
+      dataList: [],
+      currentPage: 1,
+      loading: false,
+      noMore: false,
+      busy: false,
+      detailVisible: false,
+      currentItem: null
+    }
+  },
+  mounted() {
+    this.loadData()
+  },
+  methods: {
+    async loadData() {
+      if (this.loading) return
+      
+      this.loading = true
+      try {
+        const response = await this.$http.get(`/api/data?page=${this.currentPage}`)
+        const { data, total } = response.data
+        
+        if (data.length === 0) {
+          this.noMore = true
+          return
+        }
+        
+        this.dataList = [...this.dataList, ...data]
+        this.currentPage++
+        
+      } catch (error) {
+        console.error('加载数据失败:', error)
+      } finally {
+        this.loading = false
+        this.busy = false
+      }
+    },
+    
+    loadMore() {
+      this.busy = true
+      this.loadData()
+    },
+    
+    truncateText(text, length) {
+      return text.length > length ? text.substring(0, length) + '...' : text
+    },
+    
+    formatTime(timestamp) {
+      return new Date(timestamp).toLocaleString()
+    },
+    
+    showDetail(item) {
+      this.currentItem = item
+      this.detailVisible = true
+    },
+    
+    detectRumor(item) {
+      // 跳转到检测模块
+      this.$router.push(`/detection?text=${encodeURIComponent(item.text)}`)
+    }
+  }
+}
+</script>
+
+<style scoped>
+.data-list {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.data-item {
+  padding: 15px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.content-preview {
+  flex: 1;
+}
+
+.text {
+  margin: 0 0 8px 0;
+  color: #333;
+}
+
+.meta {
+  font-size: 12px;
+  color: #999;
+}
+
+.meta .time {
+  margin-right: 10px;
+}
+
+.loading, .no-more {
+  text-align: center;
+  padding: 20px;
+  color: #999;
+}
+
+.detail-image {
+  max-width: 100%;
+  margin-top: 10px;
+}
+</style>

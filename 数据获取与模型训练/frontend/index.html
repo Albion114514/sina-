@@ -1,0 +1,1772 @@
+<html lang="zh-CN"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>谣言检测系统</title>
+  <!-- Tailwind CSS v3 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  <!-- 统一的 Tailwind 配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#1e40af',
+            secondary: '#3b82f6',
+            accent: '#60a5fa',
+            warning: '#f59e0b',
+            danger: '#dc2626',
+            success: '#10b981',
+            light: '#f3f4f6',
+            dark: '#1f2937'
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          animation: {
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          }
+        }
+      }
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .text-shadow {
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+      }
+      .card-hover {
+        @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+      }
+      .btn-primary {
+        @apply bg-primary text-white px-4 py-2 rounded-md hover:bg-opacity-90 transition-all;
+      }
+      .btn-secondary {
+        @apply bg-secondary text-white px-4 py-2 rounded-md hover:bg-opacity-90 transition-all;
+      }
+      .btn-danger {
+        @apply bg-danger text-white px-4 py-2 rounded-md hover:bg-opacity-90 transition-all;
+      }
+      .btn-success {
+        @apply bg-success text-white px-4 py-2 rounded-md hover:bg-opacity-90 transition-all;
+      }
+      .btn-outline {
+        @apply border border-gray-300 px-4 py-2 rounded-md hover:bg-gray-100 transition-all;
+      }
+      .badge {
+        @apply px-2 py-1 text-xs font-semibold rounded-full;
+      }
+      .badge-danger {
+        @apply bg-red-100 text-red-800;
+      }
+      .badge-success {
+        @apply bg-green-100 text-green-800;
+      }
+      .badge-warning {
+        @apply bg-yellow-100 text-yellow-800;
+      }
+      .progress-bar {
+        @apply h-2 rounded-full bg-gray-200 overflow-hidden;
+      }
+      .progress-value {
+        @apply h-full rounded-full transition-all duration-500;
+      }
+      .progress-danger {
+        @apply bg-red-500;
+      }
+      .progress-warning {
+        @apply bg-yellow-500;
+      }
+      .progress-success {
+        @apply bg-green-500;
+      }
+      .tab-active {
+        @apply border-b-2 border-primary text-primary;
+      }
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen">
+  <!-- 顶部导航栏 -->
+  <header class="bg-white shadow-sm sticky top-0 z-50">
+    <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <i class="fa fa-shield text-primary text-2xl"></i>
+        <h1 class="text-xl font-bold text-primary">谣言检测系统</h1>
+      </div>
+      <nav class="hidden md:flex space-x-6">
+        <a href="#data-display" class="tab-active py-2 px-1 font-medium">数据展示</a>
+        <a href="#detection-results" class="py-2 px-1 font-medium hover:text-primary">检测结果</a>
+        <a href="#manual-verification" class="py-2 px-1 font-medium hover:text-primary">人工校验</a>
+        <a href="#keyword-search" class="py-2 px-1 font-medium hover:text-primary">关键字搜索</a>
+      </nav>
+      <div class="md:hidden">
+        <button id="mobile-menu-button" class="text-gray-500 hover:text-primary">
+          <i class="fa fa-bars text-xl"></i>
+        </button>
+      </div>
+    </div>
+    <!-- 移动端菜单 -->
+    <div id="mobile-menu" class="md:hidden hidden bg-white border-t border-gray-100">
+      <div class="container mx-auto px-4 py-2 flex flex-col space-y-2">
+        <a href="#data-display" class="tab-active py-2 px-1 font-medium">数据展示</a>
+        <a href="#detection-results" class="py-2 px-1 font-medium hover:text-primary">检测结果</a>
+        <a href="#manual-verification" class="py-2 px-1 font-medium hover:text-primary">人工校验</a>
+        <a href="#keyword-search" class="py-2 px-1 font-medium hover:text-primary">关键字搜索</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主要内容区域 -->
+  <main class="container mx-auto px-4 py-6">
+    <!-- 数据概览卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div class="bg-white rounded-lg shadow-sm p-6 card-hover">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm text-gray-500">总数据量</p>
+            <h3 class="text-2xl font-bold mt-1">12,458</h3>
+          </div>
+          <div class="bg-blue-100 p-3 rounded-full">
+            <i class="fa fa-database text-primary text-xl"></i>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center text-sm">
+          <span class="text-green-500 flex items-center">
+            <i class="fa fa-arrow-up mr-1"></i> 12.5%
+          </span>
+          <span class="text-gray-500 ml-2">较上周</span>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-lg shadow-sm p-6 card-hover">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm text-gray-500">谣言检测率</p>
+            <h3 class="text-2xl font-bold mt-1">24.8%</h3>
+          </div>
+          <div class="bg-red-100 p-3 rounded-full">
+            <i class="fa fa-exclamation-triangle text-danger text-xl"></i>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center text-sm">
+          <span class="text-red-500 flex items-center">
+            <i class="fa fa-arrow-up mr-1"></i> 3.2%
+          </span>
+          <span class="text-gray-500 ml-2">较上周</span>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-lg shadow-sm p-6 card-hover">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm text-gray-500">待人工校验</p>
+            <h3 class="text-2xl font-bold mt-1">342</h3>
+          </div>
+          <div class="bg-yellow-100 p-3 rounded-full">
+            <i class="fa fa-clock-o text-warning text-xl"></i>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center text-sm">
+          <span class="text-red-500 flex items-center">
+            <i class="fa fa-arrow-up mr-1"></i> 8.7%
+          </span>
+          <span class="text-gray-500 ml-2">较上周</span>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-lg shadow-sm p-6 card-hover">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm text-gray-500">已处理数据</p>
+            <h3 class="text-2xl font-bold mt-1">1,896</h3>
+          </div>
+          <div class="bg-green-100 p-3 rounded-full">
+            <i class="fa fa-check-circle text-success text-xl"></i>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center text-sm">
+          <span class="text-green-500 flex items-center">
+            <i class="fa fa-arrow-up mr-1"></i> 15.3%
+          </span>
+          <span class="text-gray-500 ml-2">较上周</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据展示模块 -->
+    <section id="data-display" class="mb-12">
+      <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold">数据展示</h2>
+          <div class="flex space-x-2">
+            <select id="data-source-filter" class="border border-gray-300 rounded-md px-3 py-1.5 text-sm">
+              <option value="all">所有来源</option>
+              <option value="weibo">新浪微博</option>
+              <option value="wechat">微信公众号</option>
+              <option value="forum">论坛</option>
+            </select>
+            <select id="data-time-filter" class="border border-gray-300 rounded-md px-3 py-1.5 text-sm">
+              <option value="all">所有时间</option>
+              <option value="today">今日</option>
+              <option value="week">本周</option>
+              <option value="month">本月</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead>
+              <tr>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">文本内容</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">来源</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">发布时间</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200" id="data-display-table-body">
+              <!-- 数据将通过 JavaScript 动态加载 -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="mt-6 flex justify-between items-center">
+          <p class="text-sm text-gray-500">显示 <span id="data-display-showing">1-10</span> 条，共 <span id="data-display-total">0</span> 条</p>
+          <div class="flex space-x-1">
+            <button id="data-display-prev" class="btn-outline py-1 px-3 disabled:opacity-50 disabled:cursor-not-allowed">
+              <i class="fa fa-chevron-left"></i>
+            </button>
+            <button id="data-display-next" class="btn-outline py-1 px-3">
+              <i class="fa fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 检测结果呈现模块 -->
+    <section id="detection-results" class="mb-12">
+      <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold">检测结果</h2>
+          <div class="flex items-center space-x-4">
+            <div class="flex items-center">
+              <label for="probability-filter" class="text-sm text-gray-500 mr-2">概率阈值:</label>
+              <input type="range" id="probability-filter" min="0" max="100" value="50" class="w-32">
+              <span id="probability-value" class="text-sm ml-2">50%</span>
+            </div>
+            <button id="apply-filter" class="btn-primary text-sm">应用筛选</button>
+          </div>
+        </div>
+        
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead>
+              <tr>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">文本内容</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">来源</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">谣言概率</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">发布时间</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200" id="detection-results-table-body">
+              <!-- 数据将通过 JavaScript 动态加载 -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="mt-6 flex justify-between items-center">
+          <p class="text-sm text-gray-500">显示 <span id="detection-showing">1-10</span> 条，共 <span id="detection-total">0</span> 条</p>
+          <div class="flex space-x-1">
+            <button id="detection-prev" class="btn-outline py-1 px-3 disabled:opacity-50 disabled:cursor-not-allowed">
+              <i class="fa fa-chevron-left"></i>
+            </button>
+            <button id="detection-next" class="btn-outline py-1 px-3">
+              <i class="fa fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 人工校验模块 -->
+    <section id="manual-verification" class="mb-12">
+      <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold">人工校验</h2>
+          <div class="flex space-x-2">
+            <button id="pending-tab" class="tab-active py-2 px-4 font-medium">待校验</button>
+            <button id="completed-tab" class="py-2 px-4 font-medium">已处理</button>
+          </div>
+        </div>
+        
+        <!-- 待校验数据 -->
+        <div id="pending-verification" class="block">
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr>
+                  <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">文本内容</th>
+                  <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">来源</th>
+                  <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">谣言概率</th>
+                  <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">发布时间</th>
+                  <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200" id="pending-table-body">
+                <!-- 数据将通过 JavaScript 动态加载 -->
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="mt-6 flex justify-between items-center">
+            <p class="text-sm text-gray-500">显示 <span id="pending-showing">1-10</span> 条，共 <span id="pending-total">0</span> 条</p>
+            <div class="flex space-x-1">
+              <button id="pending-prev" class="btn-outline py-1 px-3 disabled:opacity-50 disabled:cursor-not-allowed">
+                <i class="fa fa-chevron-left"></i>
+              </button>
+              <button id="pending-next" class="btn-outline py-1 px-3">
+                <i class="fa fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 已处理数据 -->
+        <div id="completed-verification" class="hidden">
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr>
+                  <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">文本内容</th>
+                  <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">性质</th>
+                  <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">来源</th>
+                  <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">谣言概率</th>
+                  <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">处理时间</th>
+                  <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200" id="completed-table-body">
+                <!-- 数据将通过 JavaScript 动态加载 -->
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="mt-6 flex justify-between items-center">
+            <p class="text-sm text-gray-500">显示 <span id="completed-showing">1-10</span> 条，共 <span id="completed-total">0</span> 条</p>
+            <div class="flex space-x-1">
+              <button id="completed-prev" class="btn-outline py-1 px-3 disabled:opacity-50 disabled:cursor-not-allowed">
+                <i class="fa fa-chevron-left"></i>
+              </button>
+              <button id="completed-next" class="btn-outline py-1 px-3">
+                <i class="fa fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 关键字搜索模块 -->
+    <section id="keyword-search" class="mb-12">
+      <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold">关键字搜索</h2>
+          <div class="flex items-center space-x-2">
+            <input type="text" id="keyword-input" placeholder="输入关键字搜索..." class="border border-gray-300 rounded-md px-3 py-1.5 text-sm w-64">
+            <button id="search-btn" class="btn-primary text-sm">搜索</button>
+            <button id="reset-btn" class="btn-outline text-sm">清除</button>
+          </div>
+        </div>
+        
+        <!-- 词云展示 -->
+        <div class="mb-8">
+          <h3 class="text-lg font-medium mb-4">热门关键字</h3>
+          <div class="bg-gray-50 rounded-lg p-4 flex justify-center">
+            <img src="https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/8d1023e1cd1e48a7ad75b2ffc1f07bc5~tplv-a9rns2rl98-image.image?rcl=20251022170913DED45A2BC11F916E1E3B&amp;rk3s=8e244e95&amp;rrcfp=f06b921b&amp;x-expires=1763716204&amp;x-signature=Z0t3yb1nR41m0nW618cq220LyOU%3D" alt="词云图" class="max-h-64 object-contain">
+          </div>
+        </div>
+        
+        <!-- 搜索结果 -->
+        <div id="search-results">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-medium">搜索结果</h3>
+            <div class="flex space-x-2">
+              <button id="search-pending-tab" class="tab-active py-2 px-4 font-medium">待处理</button>
+              <button id="search-completed-tab" class="py-2 px-4 font-medium">已处理</button>
+            </div>
+          </div>
+          
+          <!-- 待处理搜索结果 -->
+          <div id="search-pending-results" class="block">
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr>
+                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">文本内容</th>
+                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">来源</th>
+                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">谣言概率</th>
+                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">发布时间</th>
+                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="search-pending-table-body">
+                  <!-- 数据将通过 JavaScript 动态加载 -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <!-- 已处理搜索结果 -->
+          <div id="search-completed-results" class="hidden">
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr>
+                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">文本内容</th>
+                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">性质</th>
+                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">来源</th>
+                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">谣言概率</th>
+                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">处理时间</th>
+                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="search-completed-table-body">
+                  <!-- 数据将通过 JavaScript 动态加载 -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 页脚 -->
+  <footer class="bg-white border-t border-gray-200 py-6">
+    <div class="container mx-auto px-4">
+      <div class="flex flex-col md:flex-row justify-between items-center">
+        <div class="mb-4 md:mb-0">
+          <p class="text-sm text-gray-500">© 2025 谣言检测系统. 保留所有权利.</p>
+        </div>
+        <div class="flex space-x-4">
+          <a href="#" class="text-gray-500 hover:text-primary">
+            <i class="fa fa-question-circle"></i> 帮助中心
+          </a>
+          <a href="#" class="text-gray-500 hover:text-primary">
+            <i class="fa fa-info-circle"></i> 关于系统
+          </a>
+          <a href="#" class="text-gray-500 hover:text-primary">
+            <i class="fa fa-envelope"></i> 联系我们
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- 详情弹窗 -->
+  <div id="detail-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold">内容详情</h3>
+          <button id="close-detail-modal" class="text-gray-500 hover:text-gray-700">
+            <i class="fa fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <div id="detail-content" class="space-y-4">
+          <!-- 详情内容将通过 JavaScript 动态加载 -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 处理弹窗 -->
+  <div id="process-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-lg shadow-lg max-w-md w-full">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold">处理内容</h3>
+          <button id="close-process-modal" class="text-gray-500 hover:text-gray-700">
+            <i class="fa fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <div id="process-content" class="space-y-4 mb-6">
+          <!-- 处理内容将通过 JavaScript 动态加载 -->
+        </div>
+        
+        <div class="flex justify-end space-x-3">
+          <button id="mark-rumor" class="btn-danger">标记为谣言</button>
+          <button id="mark-not-rumor" class="btn-success">标记为非谣言</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 修改弹窗 -->
+  <div id="modify-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-lg shadow-lg max-w-md w-full">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold">修改处理结果</h3>
+          <button id="close-modify-modal" class="text-gray-500 hover:text-gray-700">
+            <i class="fa fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <div id="modify-content" class="space-y-4 mb-6">
+          <!-- 修改内容将通过 JavaScript 动态加载 -->
+        </div>
+        
+        <div class="flex justify-end space-x-3">
+          <button id="modify-to-rumor" class="btn-danger">修改为谣言</button>
+          <button id="modify-to-not-rumor" class="btn-success">修改为非谣言</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript -->
+  <script>
+    // 示例数据
+    const sampleData = [
+      {
+        id: 1,
+        text: "现在的广告害死小学生【衰】",
+        source: "新浪微博",
+        user: {
+          name: "笑话有木有",
+          avatar: "https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/596a5e634f0f41baa3292de14f718de9~tplv-a9rns2rl98-image.image?rcl=20251022170913DED45A2BC11F916E1E3B&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1763716175&x-signature=hW40ECoJlf%2F1fn4RWdgPn7sAJIs%3D",
+          location: "广东深圳"
+        },
+        image: "https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/2344131473f04752b3bf550f1d21ed96~tplv-a9rns2rl98-image.image?rcl=20251022170913DED45A2BC11F916E1E3B&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1763716193&x-signature=fahvppYgutknjkYzdnP6c1wc3kQ%3D",
+        timestamp: "2025-07-20 14:30:25",
+        rumorProbability: 99.89,
+        status: "pending",
+        commentsCount: 103,
+        repostsCount: 564,
+        followersCount: 1987534
+      },
+      {
+        id: 2,
+        text: "原来是真事啊？!!新闻都报道了!",
+        source: "新浪微博",
+        user: {
+          name: "科技爱好者",
+          avatar: "https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/596a5e634f0f41baa3292de14f718de9~tplv-a9rns2rl98-image.image?rcl=20251022170913DED45A2BC11F916E1E3B&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1763716175&x-signature=hW40ECoJlf%2F1fn4RWdgPn7sAJIs%3D",
+          location: "北京"
+        },
+        image: "",
+        timestamp: "2025-07-19 09:15:42",
+        rumorProbability: 99.89,
+        status: "pending",
+        commentsCount: 42,
+        repostsCount: 128,
+        followersCount: 34567
+      },
+      {
+        id: 3,
+        text: "若是有人在路上拦你...",
+        source: "微信公众号",
+        user: {
+          name: "生活小贴士",
+          avatar: "https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/596a5e634f0f41baa3292de14f718de9~tplv-a9rns2rl98-image.image?rcl=20251022170913DED45A2BC11F916E1E3B&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1763716175&x-signature=hW40ECoJlf%2F1fn4RWdgPn7sAJIs%3D",
+          location: "上海"
+        },
+        image: "",
+        timestamp: "2025-07-18 16:42:10",
+        rumorProbability: 99.89,
+        status: "completed",
+        nature: "rumor",
+        processedTime: "2025-07-18 18:30:05",
+        commentsCount: 78,
+        repostsCount: 235,
+        followersCount: 123456
+      },
+      {
+        id: 4,
+        text: "今天约好去海底捞...",
+        source: "微信朋友圈",
+        user: {
+          name: "美食达人",
+          avatar: "https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/596a5e634f0f41baa3292de14f718de9~tplv-a9rns2rl98-image.image?rcl=20251022170913DED45A2BC11F916E1E3B&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1763716175&x-signature=hW40ECoJlf%2F1fn4RWdgPn7sAJIs%3D",
+          location: "广州"
+        },
+        image: "",
+        timestamp: "2025-07-17 12:05:33",
+        rumorProbability: 1.2,
+        status: "completed",
+        nature: "not_rumor",
+        processedTime: "2025-07-17 14:20:18",
+        commentsCount: 15,
+        repostsCount: 8,
+        followersCount: 2345
+      },
+      {
+        id: 5,
+        text: "最新研究表明，长期使用手机会导致记忆力下降",
+        source: "论坛",
+        user: {
+          name: "健康专家",
+          avatar: "https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/596a5e634f0f41baa3292de14f718de9~tplv-a9rns2rl98-image.image?rcl=20251022170913DED45A2BC11F916E1E3B&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1763716175&x-signature=hW40ECoJlf%2F1fn4RWdgPn7sAJIs%3D",
+          location: "成都"
+        },
+        image: "",
+        timestamp: "2025-07-16 08:22:19",
+        rumorProbability: 87.5,
+        status: "pending",
+        commentsCount: 215,
+        repostsCount: 342,
+        followersCount: 56789
+      },
+      {
+        id: 6,
+        text: "专家建议每天喝8杯水有益健康",
+        source: "微信公众号",
+        user: {
+          name: "健康生活",
+          avatar: "https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/596a5e634f0f41baa3292de14f718de9~tplv-a9rns2rl98-image.image?rcl=20251022170913DED45A2BC11F916E1E3B&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1763716175&x-signature=hW40ECoJlf%2F1fn4RWdgPn7sAJIs%3D",
+          location: "杭州"
+        },
+        image: "",
+        timestamp: "2025-07-15 11:35:47",
+        rumorProbability: 2.3,
+        status: "completed",
+        nature: "not_rumor",
+        processedTime: "2025-07-15 13:45:22",
+        commentsCount: 45,
+        repostsCount: 78,
+        followersCount: 89012
+      },
+      {
+        id: 7,
+        text: "吃大蒜可以预防新冠病毒",
+        source: "新浪微博",
+        user: {
+          name: "养生之道",
+          avatar: "https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/596a5e634f0f41baa3292de14f718de9~tplv-a9rns2rl98-image.image?rcl=20251022170913DED45A2BC11F916E1E3B&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1763716175&x-signature=hW40ECoJlf%2F1fn4RWdgPn7sAJIs%3D",
+          location: "武汉"
+        },
+        image: "",
+        timestamp: "2025-07-14 19:20:15",
+        rumorProbability: 98.7,
+        status: "completed",
+        nature: "rumor",
+        processedTime: "2025-07-14 21:15:30",
+        commentsCount: 320,
+        repostsCount: 567,
+        followersCount: 123456
+      },
+      {
+        id: 8,
+        text: "明天将有强台风登陆沿海地区，请做好防范准备",
+        source: "政府公告",
+        user: {
+          name: "气象预警",
+          avatar: "https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/596a5e634f0f41baa3292de14f718de9~tplv-a9rns2rl98-image.image?rcl=20251022170913DED45A2BC11F916E1E3B&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1763716175&x-signature=hW40ECoJlf%2F1fn4RWdgPn7sAJIs%3D",
+          location: "南京"
+        },
+        image: "",
+        timestamp: "2025-07-13 07:15:30",
+        rumorProbability: 0.5,
+        status: "completed",
+        nature: "not_rumor",
+        processedTime: "2025-07-13 08:20:45",
+        commentsCount: 156,
+        repostsCount: 890,
+        followersCount: 456789
+      },
+      {
+        id: 9,
+        text: "某知名品牌奶粉被检出有害物质，已造成多名婴儿患病",
+        source: "论坛",
+        user: {
+          name: "食品安全关注",
+          avatar: "https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/596a5e634f0f41baa3292de14f718de9~tplv-a9rns2rl98-image.image?rcl=20251022170913DED45A2BC11F916E1E3B&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1763716175&x-signature=hW40ECoJlf%2F1fn4RWdgPn7sAJIs%3D",
+          location: "西安"
+        },
+        image: "",
+        timestamp: "2025-07-12 15:40:22",
+        rumorProbability: 76.3,
+        status: "pending",
+        commentsCount: 421,
+        repostsCount: 789,
+        followersCount: 98765
+      },
+      {
+        id: 10,
+        text: "国家将提高个人所得税起征点至每月8000元",
+        source: "微信公众号",
+        user: {
+          name: "财经资讯",
+          avatar: "https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/596a5e634f0f41baa3292de14f718de9~tplv-a9rns2rl98-image.image?rcl=20251022170913DED45A2BC11F916E1E3B&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1763716175&x-signature=hW40ECoJlf%2F1fn4RWdgPn7sAJIs%3D",
+          location: "北京"
+        },
+        image: "",
+        timestamp: "2025-07-11 10:15:36",
+        rumorProbability: 65.8,
+        status: "pending",
+        commentsCount: 356,
+        repostsCount: 678,
+        followersCount: 234567
+      },
+      {
+        id: 11,
+        text: "经常熬夜会导致脱发和免疫力下降",
+        source: "新浪微博",
+        user: {
+          name: "健康科普",
+          avatar: "https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/596a5e634f0f41baa3292de14f718de9~tplv-a9rns2rl98-image.image?rcl=20251022170913DED45A2BC11F916E1E3B&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1763716175&x-signature=hW40ECoJlf%2F1fn4RWdgPn7sAJIs%3D",
+          location: "上海"
+        },
+        image: "",
+        timestamp: "2025-07-10 21:30:45",
+        rumorProbability: 5.2,
+        status: "completed",
+        nature: "not_rumor",
+        processedTime: "2025-07-11 09:45:12",
+        commentsCount: 89,
+        repostsCount: 123,
+        followersCount: 45678
+      },
+      {
+        id: 12,
+        text: "某地出现不明原因传染病，已造成多人死亡",
+        source: "论坛",
+        user: {
+          name: "时事关注",
+          avatar: "https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/596a5e634f0f41baa3292de14f718de9~tplv-a9rns2rl98-image.image?rcl=20251022170913DED45A2BC11F916E1E3B&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1763716175&x-signature=hW40ECoJlf%2F1fn4RWdgPn7sAJIs%3D",
+          location: "广州"
+        },
+        image: "",
+        timestamp: "2025-07-09 14:25:18",
+        rumorProbability: 92.7,
+        status: "completed",
+        nature: "rumor",
+        processedTime: "2025-07-09 16:30:45",
+        commentsCount: 567,
+        repostsCount: 987,
+        followersCount: 123456
+      }
+    ];
+
+    // 页面加载完成后执行
+    document.addEventListener('DOMContentLoaded', function() {
+      // 初始化各模块数据
+      initDataDisplay();
+      initDetectionResults();
+      initManualVerification();
+      initKeywordSearch();
+      
+      // 移动端菜单切换
+      document.getElementById('mobile-menu-button').addEventListener('click', function() {
+        const mobileMenu = document.getElementById('mobile-menu');
+        mobileMenu.classList.toggle('hidden');
+      });
+      
+      // 概率阈值滑块
+      const probabilityFilter = document.getElementById('probability-filter');
+      const probabilityValue = document.getElementById('probability-value');
+      
+      probabilityFilter.addEventListener('input', function() {
+        probabilityValue.textContent = this.value + '%';
+      });
+      
+      // 应用筛选按钮
+      document.getElementById('apply-filter').addEventListener('click', function() {
+        initDetectionResults();
+      });
+      
+      // 人工校验标签页切换
+      document.getElementById('pending-tab').addEventListener('click', function() {
+        this.classList.add('tab-active');
+        document.getElementById('completed-tab').classList.remove('tab-active');
+        document.getElementById('pending-verification').classList.remove('hidden');
+        document.getElementById('completed-verification').classList.add('hidden');
+      });
+      
+      document.getElementById('completed-tab').addEventListener('click', function() {
+        this.classList.add('tab-active');
+        document.getElementById('pending-tab').classList.remove('tab-active');
+        document.getElementById('completed-verification').classList.remove('hidden');
+        document.getElementById('pending-verification').classList.add('hidden');
+      });
+      
+      // 搜索结果标签页切换
+      document.getElementById('search-pending-tab').addEventListener('click', function() {
+        this.classList.add('tab-active');
+        document.getElementById('search-completed-tab').classList.remove('tab-active');
+        document.getElementById('search-pending-results').classList.remove('hidden');
+        document.getElementById('search-completed-results').classList.add('hidden');
+      });
+      
+      document.getElementById('search-completed-tab').addEventListener('click', function() {
+        this.classList.add('tab-active');
+        document.getElementById('search-pending-tab').classList.remove('tab-active');
+        document.getElementById('search-completed-results').classList.remove('hidden');
+        document.getElementById('search-pending-results').classList.add('hidden');
+      });
+      
+      // 搜索按钮
+      document.getElementById('search-btn').addEventListener('click', function() {
+        const keyword = document.getElementById('keyword-input').value.trim();
+        if (keyword) {
+          searchByKeyword(keyword);
+        }
+      });
+      
+      // 清除按钮
+      document.getElementById('reset-btn').addEventListener('click', function() {
+        document.getElementById('keyword-input').value = '';
+        document.getElementById('search-pending-table-body').innerHTML = '';
+        document.getElementById('search-completed-table-body').innerHTML = '';
+      });
+      
+      // 详情弹窗关闭按钮
+      document.getElementById('close-detail-modal').addEventListener('click', function() {
+        document.getElementById('detail-modal').classList.add('hidden');
+      });
+      
+      // 处理弹窗关闭按钮
+      document.getElementById('close-process-modal').addEventListener('click', function() {
+        document.getElementById('process-modal').classList.add('hidden');
+      });
+      
+      // 修改弹窗关闭按钮
+      document.getElementById('close-modify-modal').addEventListener('click', function() {
+        document.getElementById('modify-modal').classList.add('hidden');
+      });
+      
+      // 标记为谣言按钮
+      document.getElementById('mark-rumor').addEventListener('click', function() {
+        const id = this.dataset.id;
+        markAsRumor(id, 'rumor');
+        document.getElementById('process-modal').classList.add('hidden');
+      });
+      
+      // 标记为非谣言按钮
+      document.getElementById('mark-not-rumor').addEventListener('click', function() {
+        const id = this.dataset.id;
+        markAsRumor(id, 'not_rumor');
+        document.getElementById('process-modal').classList.add('hidden');
+      });
+      
+      // 修改为谣言按钮
+      document.getElementById('modify-to-rumor').addEventListener('click', function() {
+        const id = this.dataset.id;
+        modifyRumorStatus(id, 'rumor');
+        document.getElementById('modify-modal').classList.add('hidden');
+      });
+      
+      // 修改为非谣言按钮
+      document.getElementById('modify-to-not-rumor').addEventListener('click', function() {
+        const id = this.dataset.id;
+        modifyRumorStatus(id, 'not_rumor');
+        document.getElementById('modify-modal').classList.add('hidden');
+      });
+      
+      // 点击弹窗外部关闭弹窗
+      window.addEventListener('click', function(event) {
+        if (event.target === document.getElementById('detail-modal')) {
+          document.getElementById('detail-modal').classList.add('hidden');
+        }
+        if (event.target === document.getElementById('process-modal')) {
+          document.getElementById('process-modal').classList.add('hidden');
+        }
+        if (event.target === document.getElementById('modify-modal')) {
+          document.getElementById('modify-modal').classList.add('hidden');
+        }
+      });
+      
+      // 数据展示分页
+      document.getElementById('data-display-prev').addEventListener('click', function() {
+        // 实现分页逻辑
+        alert('上一页功能');
+      });
+      
+      document.getElementById('data-display-next').addEventListener('click', function() {
+        // 实现分页逻辑
+        alert('下一页功能');
+      });
+      
+      // 检测结果分页
+      document.getElementById('detection-prev').addEventListener('click', function() {
+        // 实现分页逻辑
+        alert('上一页功能');
+      });
+      
+      document.getElementById('detection-next').addEventListener('click', function() {
+        // 实现分页逻辑
+        alert('下一页功能');
+      });
+      
+      // 待校验数据分页
+      document.getElementById('pending-prev').addEventListener('click', function() {
+        // 实现分页逻辑
+        alert('上一页功能');
+      });
+      
+      document.getElementById('pending-next').addEventListener('click', function() {
+        // 实现分页逻辑
+        alert('下一页功能');
+      });
+      
+      // 已处理数据分页
+      document.getElementById('completed-prev').addEventListener('click', function() {
+        // 实现分页逻辑
+        alert('上一页功能');
+      });
+      
+      document.getElementById('completed-next').addEventListener('click', function() {
+        // 实现分页逻辑
+        alert('下一页功能');
+      });
+      
+      // 数据来源筛选
+      document.getElementById('data-source-filter').addEventListener('change', function() {
+        initDataDisplay();
+      });
+      
+      // 时间筛选
+      document.getElementById('data-time-filter').addEventListener('change', function() {
+        initDataDisplay();
+      });
+    });
+
+    // 初始化数据展示模块
+    function initDataDisplay() {
+      const tableBody = document.getElementById('data-display-table-body');
+      tableBody.innerHTML = '';
+      
+      const sourceFilter = document.getElementById('data-source-filter').value;
+      const timeFilter = document.getElementById('data-time-filter').value;
+      
+      let filteredData = sampleData;
+      
+      // 应用来源筛选
+      if (sourceFilter !== 'all') {
+        filteredData = filteredData.filter(item => item.source.toLowerCase().includes(sourceFilter));
+      }
+      
+      // 应用时间筛选 (简化实现)
+      if (timeFilter !== 'all') {
+        const now = new Date();
+        let cutoffDate;
+        
+        if (timeFilter === 'today') {
+          cutoffDate = new Date(now.setHours(0, 0, 0, 0));
+        } else if (timeFilter === 'week') {
+          cutoffDate = new Date(now.setDate(now.getDate() - 7));
+        } else if (timeFilter === 'month') {
+          cutoffDate = new Date(now.setMonth(now.getMonth() - 1));
+        }
+        
+        filteredData = filteredData.filter(item => {
+          const itemDate = new Date(item.timestamp);
+          return itemDate >= cutoffDate;
+        });
+      }
+      
+      // 显示数据
+      filteredData.forEach(item => {
+        const row = document.createElement('tr');
+        
+        // 文本内容
+        const textCell = document.createElement('td');
+        textCell.className = 'px-6 py-4 whitespace-nowrap';
+        textCell.innerHTML = `
+          <div class="text-sm font-medium text-gray-900">${truncateText(item.text, 50)}</div>
+        `;
+        row.appendChild(textCell);
+        
+        // 来源
+        const sourceCell = document.createElement('td');
+        sourceCell.className = 'px-6 py-4 whitespace-nowrap';
+        sourceCell.innerHTML = `
+          <div class="text-sm text-gray-500">${item.source}</div>
+        `;
+        row.appendChild(sourceCell);
+        
+        // 发布时间
+        const timeCell = document.createElement('td');
+        timeCell.className = 'px-6 py-4 whitespace-nowrap';
+        timeCell.innerHTML = `
+          <div class="text-sm text-gray-500">${item.timestamp}</div>
+        `;
+        row.appendChild(timeCell);
+        
+        // 操作
+        const actionCell = document.createElement('td');
+        actionCell.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium';
+        actionCell.innerHTML = `
+          <button class="text-primary hover:text-primary-dark mr-3 detail-btn" data-id="${item.id}">详情</button>
+        `;
+        row.appendChild(actionCell);
+        
+        tableBody.appendChild(row);
+      });
+      
+      // 更新分页信息
+      document.getElementById('data-display-showing').textContent = `1-${Math.min(filteredData.length, 10)}`;
+      document.getElementById('data-display-total').textContent = filteredData.length;
+      
+      // 添加详情按钮点击事件
+      document.querySelectorAll('.detail-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const id = parseInt(this.dataset.id);
+          showDetail(id);
+        });
+      });
+    }
+
+    // 初始化检测结果模块
+    function initDetectionResults() {
+      const tableBody = document.getElementById('detection-results-table-body');
+      tableBody.innerHTML = '';
+      
+      const probabilityThreshold = parseInt(document.getElementById('probability-filter').value);
+      
+      // 筛选数据
+      const filteredData = sampleData.filter(item => item.rumorProbability >= probabilityThreshold);
+      
+      // 按谣言概率降序排序
+      filteredData.sort((a, b) => b.rumorProbability - a.rumorProbability);
+      
+      // 显示数据
+      filteredData.forEach(item => {
+        const row = document.createElement('tr');
+        
+        // 文本内容
+        const textCell = document.createElement('td');
+        textCell.className = 'px-6 py-4 whitespace-nowrap';
+        textCell.innerHTML = `
+          <div class="text-sm font-medium text-gray-900">${truncateText(item.text, 50)}</div>
+        `;
+        row.appendChild(textCell);
+        
+        // 来源
+        const sourceCell = document.createElement('td');
+        sourceCell.className = 'px-6 py-4 whitespace-nowrap';
+        sourceCell.innerHTML = `
+          <div class="text-sm text-gray-500">${item.source}</div>
+        `;
+        row.appendChild(sourceCell);
+        
+        // 谣言概率
+        const probabilityCell = document.createElement('td');
+        probabilityCell.className = 'px-6 py-4 whitespace-nowrap';
+        
+        let progressClass = 'progress-success';
+        if (item.rumorProbability >= 70) {
+          progressClass = 'progress-danger';
+        } else if (item.rumorProbability >= 30) {
+          progressClass = 'progress-warning';
+        }
+        
+        probabilityCell.innerHTML = `
+          <div class="flex items-center">
+            <div class="w-32 mr-2">
+              <div class="progress-bar">
+                <div class="progress-value ${progressClass}" style="width: ${item.rumorProbability}%"></div>
+              </div>
+            </div>
+            <span class="text-sm ${item.rumorProbability >= 70 ? 'text-red-600 font-bold' : item.rumorProbability >= 30 ? 'text-yellow-600' : 'text-green-600'}">${item.rumorProbability.toFixed(2)}%</span>
+          </div>
+        `;
+        row.appendChild(probabilityCell);
+        
+        // 发布时间
+        const timeCell = document.createElement('td');
+        timeCell.className = 'px-6 py-4 whitespace-nowrap';
+        timeCell.innerHTML = `
+          <div class="text-sm text-gray-500">${item.timestamp}</div>
+        `;
+        row.appendChild(timeCell);
+        
+        // 操作
+        const actionCell = document.createElement('td');
+        actionCell.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium';
+        
+        let actionButton = '';
+        if (item.status === 'pending') {
+          actionButton = `<button class="text-primary hover:text-primary-dark process-btn" data-id="${item.id}">处理</button>`;
+        } else {
+          const natureText = item.nature === 'rumor' ? '谣言' : '非谣言';
+          const natureClass = item.nature === 'rumor' ? 'badge-danger' : 'badge-success';
+          actionButton = `<span class="badge ${natureClass}">${natureText}</span>`;
+        }
+        
+        actionCell.innerHTML = `
+          <button class="text-primary hover:text-primary-dark mr-3 detail-btn" data-id="${item.id}">详情</button>
+          ${actionButton}
+        `;
+        row.appendChild(actionCell);
+        
+        tableBody.appendChild(row);
+      });
+      
+      // 更新分页信息
+      document.getElementById('detection-showing').textContent = `1-${Math.min(filteredData.length, 10)}`;
+      document.getElementById('detection-total').textContent = filteredData.length;
+      
+      // 添加详情按钮点击事件
+      document.querySelectorAll('.detail-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const id = parseInt(this.dataset.id);
+          showDetail(id);
+        });
+      });
+      
+      // 添加处理按钮点击事件
+      document.querySelectorAll('.process-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const id = parseInt(this.dataset.id);
+          showProcessModal(id);
+        });
+      });
+    }
+
+    // 初始化人工校验模块
+    function initManualVerification() {
+      // 待校验数据
+      const pendingTableBody = document.getElementById('pending-table-body');
+      pendingTableBody.innerHTML = '';
+      
+      // 已处理数据
+      const completedTableBody = document.getElementById('completed-table-body');
+      completedTableBody.innerHTML = '';
+      
+      // 筛选待校验数据
+      const pendingData = sampleData.filter(item => item.status === 'pending');
+      
+      // 筛选已处理数据
+      const completedData = sampleData.filter(item => item.status === 'completed');
+      
+      // 显示待校验数据
+      pendingData.forEach(item => {
+        const row = document.createElement('tr');
+        
+        // 文本内容
+        const textCell = document.createElement('td');
+        textCell.className = 'px-6 py-4 whitespace-nowrap';
+        textCell.innerHTML = `
+          <div class="text-sm font-medium text-gray-900">${truncateText(item.text, 50)}</div>
+        `;
+        row.appendChild(textCell);
+        
+        // 来源
+        const sourceCell = document.createElement('td');
+        sourceCell.className = 'px-6 py-4 whitespace-nowrap';
+        sourceCell.innerHTML = `
+          <div class="text-sm text-gray-500">${item.source}</div>
+        `;
+        row.appendChild(sourceCell);
+        
+        // 谣言概率
+        const probabilityCell = document.createElement('td');
+        probabilityCell.className = 'px-6 py-4 whitespace-nowrap';
+        
+        let progressClass = 'progress-success';
+        if (item.rumorProbability >= 70) {
+          progressClass = 'progress-danger';
+        } else if (item.rumorProbability >= 30) {
+          progressClass = 'progress-warning';
+        }
+        
+        probabilityCell.innerHTML = `
+          <div class="flex items-center">
+            <div class="w-32 mr-2">
+              <div class="progress-bar">
+                <div class="progress-value ${progressClass}" style="width: ${item.rumorProbability}%"></div>
+              </div>
+            </div>
+            <span class="text-sm ${item.rumorProbability >= 70 ? 'text-red-600 font-bold' : item.rumorProbability >= 30 ? 'text-yellow-600' : 'text-green-600'}">${item.rumorProbability.toFixed(2)}%</span>
+          </div>
+        `;
+        row.appendChild(probabilityCell);
+        
+        // 发布时间
+        const timeCell = document.createElement('td');
+        timeCell.className = 'px-6 py-4 whitespace-nowrap';
+        timeCell.innerHTML = `
+          <div class="text-sm text-gray-500">${item.timestamp}</div>
+        `;
+        row.appendChild(timeCell);
+        
+        // 操作
+        const actionCell = document.createElement('td');
+        actionCell.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium';
+        actionCell.innerHTML = `
+          <button class="text-primary hover:text-primary-dark mr-3 detail-btn" data-id="${item.id}">详情</button>
+          <button class="text-primary hover:text-primary-dark process-btn" data-id="${item.id}">处理</button>
+        `;
+        row.appendChild(actionCell);
+        
+        pendingTableBody.appendChild(row);
+      });
+      
+      // 显示已处理数据
+      completedData.forEach(item => {
+        const row = document.createElement('tr');
+        
+        // 文本内容
+        const textCell = document.createElement('td');
+        textCell.className = 'px-6 py-4 whitespace-nowrap';
+        textCell.innerHTML = `
+          <div class="text-sm font-medium text-gray-900">${truncateText(item.text, 50)}</div>
+        `;
+        row.appendChild(textCell);
+        
+        // 性质
+        const natureCell = document.createElement('td');
+        natureCell.className = 'px-6 py-4 whitespace-nowrap';
+        
+        const natureText = item.nature === 'rumor' ? '谣言' : '非谣言';
+        const natureClass = item.nature === 'rumor' ? 'badge-danger' : 'badge-success';
+        
+        natureCell.innerHTML = `
+          <span class="badge ${natureClass}">${natureText}</span>
+        `;
+        row.appendChild(natureCell);
+        
+        // 来源
+        const sourceCell = document.createElement('td');
+        sourceCell.className = 'px-6 py-4 whitespace-nowrap';
+        sourceCell.innerHTML = `
+          <div class="text-sm text-gray-500">${item.source}</div>
+        `;
+        row.appendChild(sourceCell);
+        
+        // 谣言概率
+        const probabilityCell = document.createElement('td');
+        probabilityCell.className = 'px-6 py-4 whitespace-nowrap';
+        
+        let progressClass = 'progress-success';
+        if (item.rumorProbability >= 70) {
+          progressClass = 'progress-danger';
+        } else if (item.rumorProbability >= 30) {
+          progressClass = 'progress-warning';
+        }
+        
+        probabilityCell.innerHTML = `
+          <div class="flex items-center">
+            <div class="w-32 mr-2">
+              <div class="progress-bar">
+                <div class="progress-value ${progressClass}" style="width: ${item.rumorProbability}%"></div>
+              </div>
+            </div>
+            <span class="text-sm ${item.rumorProbability >= 70 ? 'text-red-600 font-bold' : item.rumorProbability >= 30 ? 'text-yellow-600' : 'text-green-600'}">${item.rumorProbability.toFixed(2)}%</span>
+          </div>
+        `;
+        row.appendChild(probabilityCell);
+        
+        // 处理时间
+        const processedTimeCell = document.createElement('td');
+        processedTimeCell.className = 'px-6 py-4 whitespace-nowrap';
+        processedTimeCell.innerHTML = `
+          <div class="text-sm text-gray-500">${item.processedTime}</div>
+        `;
+        row.appendChild(processedTimeCell);
+        
+        // 操作
+        const actionCell = document.createElement('td');
+        actionCell.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium';
+        actionCell.innerHTML = `
+          <button class="text-primary hover:text-primary-dark mr-3 detail-btn" data-id="${item.id}">详情</button>
+          <button class="text-primary hover:text-primary-dark modify-btn" data-id="${item.id}">修改</button>
+        `;
+        row.appendChild(actionCell);
+        
+        completedTableBody.appendChild(row);
+      });
+      
+      // 更新分页信息
+      document.getElementById('pending-showing').textContent = `1-${Math.min(pendingData.length, 10)}`;
+      document.getElementById('pending-total').textContent = pendingData.length;
+      
+      document.getElementById('completed-showing').textContent = `1-${Math.min(completedData.length, 10)}`;
+      document.getElementById('completed-total').textContent = completedData.length;
+      
+      // 添加详情按钮点击事件
+      document.querySelectorAll('#pending-table-body .detail-btn, #completed-table-body .detail-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const id = parseInt(this.dataset.id);
+          showDetail(id);
+        });
+      });
+      
+      // 添加处理按钮点击事件
+      document.querySelectorAll('#pending-table-body .process-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const id = parseInt(this.dataset.id);
+          showProcessModal(id);
+        });
+      });
+      
+      // 添加修改按钮点击事件
+      document.querySelectorAll('#completed-table-body .modify-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const id = parseInt(this.dataset.id);
+          showModifyModal(id);
+        });
+      });
+    }
+
+    // 初始化关键字搜索模块
+    function initKeywordSearch() {
+      // 清空搜索结果
+      document.getElementById('search-pending-table-body').innerHTML = '';
+      document.getElementById('search-completed-table-body').innerHTML = '';
+    }
+
+    // 按关键字搜索
+    function searchByKeyword(keyword) {
+      // 清空搜索结果
+      document.getElementById('search-pending-table-body').innerHTML = '';
+      document.getElementById('search-completed-table-body').innerHTML = '';
+      
+      // 筛选包含关键字的数据
+      const filteredData = sampleData.filter(item => 
+        item.text.toLowerCase().includes(keyword.toLowerCase()) || 
+        item.user.name.toLowerCase().includes(keyword.toLowerCase())
+      );
+      
+      // 分离待处理和已处理数据
+      const pendingData = filteredData.filter(item => item.status === 'pending');
+      const completedData = filteredData.filter(item => item.status === 'completed');
+      
+      // 显示待处理搜索结果
+      pendingData.forEach(item => {
+        const row = document.createElement('tr');
+        
+        // 文本内容
+        const textCell = document.createElement('td');
+        textCell.className = 'px-6 py-4 whitespace-nowrap';
+        textCell.innerHTML = `
+          <div class="text-sm font-medium text-gray-900">${highlightKeyword(truncateText(item.text, 50), keyword)}</div>
+        `;
+        row.appendChild(textCell);
+        
+        // 来源
+        const sourceCell = document.createElement('td');
+        sourceCell.className = 'px-6 py-4 whitespace-nowrap';
+        sourceCell.innerHTML = `
+          <div class="text-sm text-gray-500">${item.source}</div>
+        `;
+        row.appendChild(sourceCell);
+        
+        // 谣言概率
+        const probabilityCell = document.createElement('td');
+        probabilityCell.className = 'px-6 py-4 whitespace-nowrap';
+        
+        let progressClass = 'progress-success';
+        if (item.rumorProbability >= 70) {
+          progressClass = 'progress-danger';
+        } else if (item.rumorProbability >= 30) {
+          progressClass = 'progress-warning';
+        }
+        
+        probabilityCell.innerHTML = `
+          <div class="flex items-center">
+            <div class="w-32 mr-2">
+              <div class="progress-bar">
+                <div class="progress-value ${progressClass}" style="width: ${item.rumorProbability}%"></div>
+              </div>
+            </div>
+            <span class="text-sm ${item.rumorProbability >= 70 ? 'text-red-600 font-bold' : item.rumorProbability >= 30 ? 'text-yellow-600' : 'text-green-600'}">${item.rumorProbability.toFixed(2)}%</span>
+          </div>
+        `;
+        row.appendChild(probabilityCell);
+        
+        // 发布时间
+        const timeCell = document.createElement('td');
+        timeCell.className = 'px-6 py-4 whitespace-nowrap';
+        timeCell.innerHTML = `
+          <div class="text-sm text-gray-500">${item.timestamp}</div>
+        `;
+        row.appendChild(timeCell);
+        
+        // 操作
+        const actionCell = document.createElement('td');
+        actionCell.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium';
+        actionCell.innerHTML = `
+          <button class="text-primary hover:text-primary-dark mr-3 detail-btn" data-id="${item.id}">详情</button>
+          <button class="text-primary hover:text-primary-dark process-btn" data-id="${item.id}">处理</button>
+        `;
+        row.appendChild(actionCell);
+        
+        document.getElementById('search-pending-table-body').appendChild(row);
+      });
+      
+      // 显示已处理搜索结果
+      completedData.forEach(item => {
+        const row = document.createElement('tr');
+        
+        // 文本内容
+        const textCell = document.createElement('td');
+        textCell.className = 'px-6 py-4 whitespace-nowrap';
+        textCell.innerHTML = `
+          <div class="text-sm font-medium text-gray-900">${highlightKeyword(truncateText(item.text, 50), keyword)}</div>
+        `;
+        row.appendChild(textCell);
+        
+        // 性质
+        const natureCell = document.createElement('td');
+        natureCell.className = 'px-6 py-4 whitespace-nowrap';
+        
+        const natureText = item.nature === 'rumor' ? '谣言' : '非谣言';
+        const natureClass = item.nature === 'rumor' ? 'badge-danger' : 'badge-success';
+        
+        natureCell.innerHTML = `
+          <span class="badge ${natureClass}">${natureText}</span>
+        `;
+        row.appendChild(natureCell);
+        
+        // 来源
+        const sourceCell = document.createElement('td');
+        sourceCell.className = 'px-6 py-4 whitespace-nowrap';
+        sourceCell.innerHTML = `
+          <div class="text-sm text-gray-500">${item.source}</div>
+        `;
+        row.appendChild(sourceCell);
+        
+        // 谣言概率
+        const probabilityCell = document.createElement('td');
+        probabilityCell.className = 'px-6 py-4 whitespace-nowrap';
+        
+        let progressClass = 'progress-success';
+        if (item.rumorProbability >= 70) {
+          progressClass = 'progress-danger';
+        } else if (item.rumorProbability >= 30) {
+          progressClass = 'progress-warning';
+        }
+        
+        probabilityCell.innerHTML = `
+          <div class="flex items-center">
+            <div class="w-32 mr-2">
+              <div class="progress-bar">
+                <div class="progress-value ${progressClass}" style="width: ${item.rumorProbability}%"></div>
+              </div>
+            </div>
+            <span class="text-sm ${item.rumorProbability >= 70 ? 'text-red-600 font-bold' : item.rumorProbability >= 30 ? 'text-yellow-600' : 'text-green-600'}">${item.rumorProbability.toFixed(2)}%</span>
+          </div>
+        `;
+        row.appendChild(probabilityCell);
+        
+        // 处理时间
+        const processedTimeCell = document.createElement('td');
+        processedTimeCell.className = 'px-6 py-4 whitespace-nowrap';
+        processedTimeCell.innerHTML = `
+          <div class="text-sm text-gray-500">${item.processedTime}</div>
+        `;
+        row.appendChild(processedTimeCell);
+        
+        // 操作
+        const actionCell = document.createElement('td');
+        actionCell.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium';
+        actionCell.innerHTML = `
+          <button class="text-primary hover:text-primary-dark mr-3 detail-btn" data-id="${item.id}">详情</button>
+          <button class="text-primary hover:text-primary-dark modify-btn" data-id="${item.id}">修改</button>
+        `;
+        row.appendChild(actionCell);
+        
+        document.getElementById('search-completed-table-body').appendChild(row);
+      });
+      
+      // 添加详情按钮点击事件
+      document.querySelectorAll('#search-pending-table-body .detail-btn, #search-completed-table-body .detail-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const id = parseInt(this.dataset.id);
+          showDetail(id);
+        });
+      });
+      
+      // 添加处理按钮点击事件
+      document.querySelectorAll('#search-pending-table-body .process-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const id = parseInt(this.dataset.id);
+          showProcessModal(id);
+        });
+      });
+      
+      // 添加修改按钮点击事件
+      document.querySelectorAll('#search-completed-table-body .modify-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const id = parseInt(this.dataset.id);
+          showModifyModal(id);
+        });
+      });
+    }
+
+    // 显示详情弹窗
+    function showDetail(id) {
+      const item = sampleData.find(item => item.id === id);
+      if (!item) return;
+      
+      const detailContent = document.getElementById('detail-content');
+      
+      // 构建详情内容
+      let content = `
+        <div class="flex items-start space-x-4">
+          <img src="${item.user.avatar}" alt="${item.user.name}" class="w-12 h-12 rounded-full">
+          <div>
+            <h4 class="font-bold">${item.user.name}</h4>
+            <p class="text-sm text-gray-500">${item.source} · ${item.user.location} · ${item.timestamp}</p>
+          </div>
+        </div>
+        
+        <div class="mt-4">
+          <p class="text-lg">${item.text}</p>
+        </div>
+      `;
+      
+      // 如果有图片，添加图片
+      if (item.image) {
+        content += `
+          <div class="mt-4">
+            <img src="${item.image}" alt="内容图片" class="max-w-full rounded-lg">
+          </div>
+        `;
+      }
+      
+      // 添加统计信息
+      content += `
+        <div class="mt-4 grid grid-cols-3 gap-4">
+          <div class="bg-gray-50 p-3 rounded-lg text-center">
+            <p class="text-sm text-gray-500">评论</p>
+            <p class="font-bold">${item.commentsCount}</p>
+          </div>
+          <div class="bg-gray-50 p-3 rounded-lg text-center">
+            <p class="text-sm text-gray-500">转发</p>
+            <p class="font-bold">${item.repostsCount}</p>
+          </div>
+          <div class="bg-gray-50 p-3 rounded-lg text-center">
+            <p class="text-sm text-gray-500">粉丝</p>
+            <p class="font-bold">${formatNumber(item.followersCount)}</p>
+          </div>
+        </div>
+      `;
+      
+      // 添加谣言概率信息
+      let probabilityClass = 'text-green-600';
+      let probabilityText = '低';
+      
+      if (item.rumorProbability >= 70) {
+        probabilityClass = 'text-red-600';
+        probabilityText = '高';
+      } else if (item.rumorProbability >= 30) {
+        probabilityClass = 'text-yellow-600';
+        probabilityText = '中';
+      }
+      
+      content += `
+        <div class="mt-4">
+          <h5 class="font-medium mb-2">谣言检测结果</h5>
+          <div class="flex items-center">
+            <div class="w-full mr-4">
+              <div class="progress-bar">
+                <div class="progress-value ${item.rumorProbability >= 70 ? 'progress-danger' : item.rumorProbability >= 30 ? 'progress-warning' : 'progress-success'}" style="width: ${item.rumorProbability}%"></div>
+              </div>
+            </div>
+            <span class="font-bold ${probabilityClass}">${item.rumorProbability.toFixed(2)}%</span>
+          </div>
+          <p class="text-sm mt-1">谣言可能性：<span class="${probabilityClass} font-medium">${probabilityText}</span></p>
+        </div>
+      `;
+      
+      // 如果已处理，显示处理结果
+      if (item.status === 'completed') {
+        const natureText = item.nature === 'rumor' ? '谣言' : '非谣言';
+        const natureClass = item.nature === 'rumor' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800';
+        
+        content += `
+          <div class="mt-4">
+            <h5 class="font-medium mb-2">人工校验结果</h5>
+            <div class="flex items-center">
+              <span class="badge ${natureClass} mr-2">${natureText}</span>
+              <span class="text-sm text-gray-500">处理时间：${item.processedTime}</span>
+            </div>
+          </div>
+        `;
+      }
+      
+      detailContent.innerHTML = content;
+      document.getElementById('detail-modal').classList.remove('hidden');
+    }
+
+    // 显示处理弹窗
+    function showProcessModal(id) {
+      const item = sampleData.find(item => item.id === id);
+      if (!item) return;
+      
+      const processContent = document.getElementById('process-content');
+      
+      // 构建处理内容
+      let content = `
+        <div class="mb-4">
+          <h5 class="font-medium mb-2">文本内容</h5>
+          <p>${item.text}</p>
+        </div>
+        
+        <div class="mb-4">
+          <h5 class="font-medium mb-2">来源信息</h5>
+          <p class="text-sm">${item.source} · ${item.timestamp}</p>
+        </div>
+        
+        <div>
+          <h5 class="font-medium mb-2">谣言检测结果</h5>
+          <div class="flex items-center">
+            <div class="w-full mr-4">
+              <div class="progress-bar">
+                <div class="progress-value ${item.rumorProbability >= 70 ? 'progress-danger' : item.rumorProbability >= 30 ? 'progress-warning' : 'progress-success'}" style="width: ${item.rumorProbability}%"></div>
+              </div>
+            </div>
+            <span class="font-bold ${item.rumorProbability >= 70 ? 'text-red-600' : item.rumorProbability >= 30 ? 'text-yellow-600' : 'text-green-600'}">${item.rumorProbability.toFixed(2)}%</span>
+          </div>
+        </div>
+      `;
+      
+      processContent.innerHTML = content;
+      
+      // 设置按钮数据
+      document.getElementById('mark-rumor').dataset.id = id;
+      document.getElementById('mark-not-rumor').dataset.id = id;
+      
+      document.getElementById('process-modal').classList.remove('hidden');
+    }
+
+    // 显示修改弹窗
+    function showModifyModal(id) {
+      const item = sampleData.find(item => item.id === id);
+      if (!item) return;
+      
+      const modifyContent = document.getElementById('modify-content');
+      
+      // 构建修改内容
+      let content = `
+        <div class="mb-4">
+          <h5 class="font-medium mb-2">文本内容</h5>
+          <p>${item.text}</p>
+        </div>
+        
+        <div class="mb-4">
+          <h5 class="font-medium mb-2">当前处理结果</h5>
+          <div class="flex items-center">
+            <span class="badge ${item.nature === 'rumor' ? 'badge-danger' : 'badge-success'} mr-2">${item.nature === 'rumor' ? '谣言' : '非谣言'}</span>
+            <span class="text-sm text-gray-500">处理时间：${item.processedTime}</span>
+          </div>
+        </div>
+        
+        <div>
+          <h5 class="font-medium mb-2">谣言检测结果</h5>
+          <div class="flex items-center">
+            <div class="w-full mr-4">
+              <div class="progress-bar">
+                <div class="progress-value ${item.rumorProbability >= 70 ? 'progress-danger' : item.rumorProbability >= 30 ? 'progress-warning' : 'progress-success'}" style="width: ${item.rumorProbability}%"></div>
+              </div>
+            </div>
+            <span class="font-bold ${item.rumorProbability >= 70 ? 'text-red-600' : item.rumorProbability >= 30 ? 'text-yellow-600' : 'text-green-600'}">${item.rumorProbability.toFixed(2)}%</span>
+          </div>
+        </div>
+      `;
+      
+      modifyContent.innerHTML = content;
+      
+      // 设置按钮数据
+      document.getElementById('modify-to-rumor').dataset.id = id;
+      document.getElementById('modify-to-not-rumor').dataset.id = id;
+      
+      document.getElementById('modify-modal').classList.remove('hidden');
+    }
+
+    // 标记为谣言或非谣言
+    function markAsRumor(id, nature) {
+      const item = sampleData.find(item => item.id === id);
+      if (!item) return;
+      
+      // 更新数据状态
+      item.status = 'completed';
+      item.nature = nature;
+      item.processedTime = getCurrentTime();
+      
+      // 重新初始化相关模块
+      initDetectionResults();
+      initManualVerification();
+      
+      // 显示成功提示
+      alert(`已成功标记为${nature === 'rumor' ? '谣言' : '非谣言'}`);
+    }
+
+    // 修改谣言状态
+    function modifyRumorStatus(id, nature) {
+      const item = sampleData.find(item => item.id === id);
+      if (!item) return;
+      
+      // 更新数据状态
+      item.nature = nature;
+      item.processedTime = getCurrentTime();
+      
+      // 重新初始化相关模块
+      initDetectionResults();
+      initManualVerification();
+      
+      // 显示成功提示
+      alert(`已成功修改为${nature === 'rumor' ? '谣言' : '非谣言'}`);
+    }
+
+    // 辅助函数：截断文本
+    function truncateText(text, length) {
+      if (text.length <= length) return text;
+      return text.substring(0, length) + '...';
+    }
+
+    // 辅助函数：高亮关键字
+    function highlightKeyword(text, keyword) {
+      if (!keyword) return text;
+      const regex = new RegExp(keyword, 'gi');
+      return text.replace(regex, match => `<span class="bg-yellow-200">${match}</span>`);
+    }
+
+    // 辅助函数：格式化数字
+    function formatNumber(num) {
+      if (num >= 1000000) {
+        return (num / 1000000).toFixed(1) + 'M';
+      } else if (num >= 1000) {
+        return (num / 1000).toFixed(1) + 'K';
+      }
+      return num;
+    }
+
+    // 辅助函数：获取当前时间
+    function getCurrentTime() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    }
+  </script>
+
+
+</body></html>

@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+weibo_crawler_main.py — unified wrapper
+Runs the mobile crawler implementation to ensure the actual scraping happens.
+"""
+
+
+
+# (patched) debug helper
+import os as _os
+def _dbg(*a, **k):
+    if _os.environ.get('DEBUG_WEIBO') == '1':
+        try:
+            print('[DEBUG]', *a, **k)
+        except Exception:
+            pass
+import sys
+import os
+from pathlib import Path
+import importlib.util
+
+MOBILE_SCRIPT = Path("weibo_mobile_crawler_main.py")
+
+def _import_from_path(path: Path, modname: str):
+    spec = importlib.util.spec_from_file_location(modname, str(path))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # type: ignore[attr-defined]
+    return module
+
+def main():
+    if not MOBILE_SCRIPT.exists():
+        print("❌ 未找到 weibo_mobile_crawler_main.py，请把移动端爬虫脚本放在当前目录")
+        sys.exit(1)
+
+    print("🚀 统一入口：即将调用移动端爬虫 weibo_mobile_crawler_main.py")
+    try:
+        mod = _import_from_path(MOBILE_SCRIPT, "weibo_mobile_crawler_main")
+    except Exception as e:
+        print("❌ 加载 weibo_mobile_crawler_main.py 失败：", e)
+        sys.exit(1)
+
+    # Prefer explicit main() if present; otherwise fall back to class API.
+    if hasattr(mod, "main") and callable(getattr(mod, "main")):
+        try:
+            mod.main()
+        except SystemExit as se:
+            # Honor exit codes from the underlying script
+            raise
+        except Exception as e:
+            print("❌ 执行 weibo_mobile_crawler_main.main() 失败：", e)
+            sys.exit(1)
+    else:
+        # Fallback: instantiate and run crawl_keywords()
+        try:
+            C = getattr(mod, "WeiboMobileCrawler", None)
+            if C is None:
+                print("❌ 未在 weibo_mobile_crawler_main.py 中找到 WeiboMobileCrawler 类或 main() 函数")
+                sys.exit(1)
+            crawler = C()
+            ok = crawler.crawl_keywords()
+            if not ok:
+                sys.exit(2)
+        except Exception as e:
+            print("❌ 执行移动端爬虫失败：", e)
+            sys.exit(1)
+
+if __name__ == "__main__":
+    main()

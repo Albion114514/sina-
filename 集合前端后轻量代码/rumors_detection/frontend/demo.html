@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>谣言检测系统 - 电子科技大学</title>
+  <script src="./cdn.jsdelivr.net_npm_echarts@5.4.3_dist_echarts.min.js"></script>
+  <script src="./cdn.bootcdn.net_ajax_libs_echarts-wordcloud_2.0.0_echarts-wordcloud.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    body {
+      background: #f5f7fa;
+      color: #333;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    header h1 {
+      font-size: 24px;
+      color: #1a73e8;
+    }
+    .module {
+      background: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .module h2 {
+      margin-bottom: 15px;
+      font-size: 18px;
+      color: #444;
+    }
+    .data-list {
+      max-height: 250px;
+      overflow-y: auto;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      padding: 10px;
+    }
+    .data-item {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .data-item:last-child {
+      border-bottom: none;
+    }
+    .rumor-prob {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+    .text-truncate{
+        max-width: 300px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        cursor: pointer;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    .table-container{
+        max-height: 250px;
+        overflow-y: auto;
+        border: 1px solid #eee;
+        border-radius: 6px;
+        margin-top: 10px;
+    }
+    .table-container table{
+        margin-top: 0;
+        width: 100%;
+    }
+    .table-container thead{
+        position: sticky;
+        top: 0;
+        background: #f0f0f0;
+        z-index: 1;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background: #f0f0f0;
+    }
+    button {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn-check {
+      background: #3498db;
+      color: white;
+    }
+    .btn-rumor {
+      background: #e74c3c;
+      color: white;
+    }
+    .btn-not-rumor {
+      background: #2ecc71;
+      color: white;
+    }
+    .rumor-result {
+    background-color: #ffeaea;
+    color: #e74c3c;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 10px;
+    }
+
+    .non-rumor-result {
+    background-color: #e8f7ef;
+    color: #27ae60;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 10px;
+    }
+    #wordcloud {
+      text-align: center;
+      margin: 20px 0;
+      min-height: 300px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .word-item{
+        display: inline-block;
+        margin: 8px;
+        padding: 4px 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: bold;
+    }
+    .word-item:hover{
+        transform: scale(1.2);
+        z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>谣言检测系统</h1>
+      <p>未来媒体研究中心 - 电子科技大学</p>
+    </header>
+
+    <!-- 数据展示模块 -->
+    <section class="module">
+      <h2>数据展示</h2>
+      <div class="data-list" id="dataList">
+        <!-- 动态加载数据 -->
+      </div>
+    </section>
+
+    <!-- 服务器检测结果模块 -->
+    <section class="module">
+      <h2>服务器检测结果</h2>
+      <div class="table-container">
+        <table id="resultTable">
+            <thead>
+            <tr>
+                <th>文本</th>
+                <th>来源</th>
+                <th>谣言概率</th>
+                <th>时间</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody id="resultBody">
+            <!-- 动态加载 -->
+            </tbody>
+        </table>
+       </div>
+    </section>
+
+    <!-- 人工校验模块 -->
+    <section class="module">
+      <h2>人工校验</h2>
+      <div class="table-container">
+        <table id="manualCheckTable">
+            <thead>
+            <tr>
+                <th>文本</th>
+                <th>来源</th>
+                <th>谣言概率</th>
+                <th>时间</th>
+                <th>结果</th>
+            </tr>
+            </thead>
+            <tbody id="manualCheckBody">
+            <!-- 动态加载 -->
+            </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 关键字搜索模块 -->
+    <section class="module">
+      <h2>关键字词云</h2>
+      <div id="wordcloud">
+        <!-- 词云动态生成 -->
+      </div>
+    </section>
+  </div>
+
+  <!-- 弹窗：人工校验详情 -->
+  <div id="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
+    <div style="background:#fff; width:600px; margin:100px auto; padding:20px; border-radius:8px;">
+      <h3>人工校验</h3>
+      <p id="modalContent"></p>
+      <div style="margin-top:20px; text-align:right;">
+        <button id="btnClose1">关闭</button>
+        <button id="btnRumor" class="btn-rumor">标记为谣言</button>
+        <button id="btnNotRumor" class="btn-not-rumor">标记为非谣言</button>
+      </div>
+    </div>
+  </div>
+  <div id="detail" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
+    <div style="background:#fff; width:600px; margin:100px auto; padding:20px; border-radius:8px;">
+      <h3>新闻详情</h3>
+      <p id="detailContent"></p>
+      <div style="margin-top:20px; text-align:right;">
+        <button id="btnClose2">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let mockData = [];
+    let keywords = [];
+    const searchedKeywords = new Set();
+    // 初始化数据展示模块
+    function initDataList() {
+      const container = document.getElementById('dataList');
+      container.innerHTML = '';
+      mockData.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'data-item';
+        div.innerHTML = `
+          <span class="text-truncate">${item.text}</span>
+          <td><button class="btn-check" onclick="showDetail(${item.id})">详情</button></td>
+        `;
+        container.appendChild(div);
+      });
+    }
+    function updateDataList(){
+        initDataList();
+    }
+
+    // 初始化检测结果表格
+    function initResultTable() {
+      const tbody = document.getElementById('resultBody');
+      tbody.innerHTML = '';
+      mockData.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="text-truncate" title="${item.text}">${item.text}</td>
+          <td>${item.source}</td>
+          <td class="rumor-prob">${item.probability}</td>
+          <td>${item.time}</td>
+          <td><button class="btn-check" onclick="showModal(${item.id})">处理</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+    function updateResultTable(){
+        initResultTable();
+    }
+    // 初始化人工校验
+    function initmanualCheckTable() {
+      const tbody = document.getElementById('manualCheckBody');
+      tbody.innerHTML = '';
+      mockData.forEach(item => {
+        if(item.dealed){
+            const tr = document.createElement('tr');
+            const resultClass = item.result ? 'rumor-result' : 'non-rumor-result';
+            tr.innerHTML = `
+            <td class="text-truncate" title="${item.text}">${item.text}</td>
+            <td>${item.source}</td>
+            <td class="rumor-prob">${item.probability}</td>
+            <td>${item.time}</td>
+            <td><span class="${resultClass}">${item.result? '谣言':'非谣言'}</span></td>
+            `;
+            tbody.appendChild(tr);
+        }
+      });
+    }
+    function updatemanualCheckTable(){
+        initmanualCheckTable();
+    };
+
+    // 初始化词云
+    function initWordCloud() {
+        const chartDom = document.getElementById('wordcloud');
+        chartDom.style.width = '100%';
+        chartDom.style.height = '300px';
+        
+        // 初始化ECharts实例
+        const myChart = echarts.init(chartDom);
+        
+        // 准备词云数据
+        const wordCloudData = keywords.map(word => ({
+            name: word.name,
+            value: word.weight,
+            // 可以设置单个词的颜色，或者使用统一的颜色函数
+            textStyle: {
+                color: getRandomColor()
+            }
+        }));
+        
+        const option = {
+            tooltip: {
+                show: true,
+                formatter: function(params) {
+                    return `${params.name}: 频率参数 ${params.value}`;
+                }
+            },
+            series: [{
+                type: 'wordCloud',
+                // 词云形状，可选：'circle', 'cardioid', 'diamond', 'triangle-forward', 
+                // 'triangle', 'pentagon', 'star'
+                shape: 'circle',
+                // 文字大小范围
+                sizeRange: [20, 60],
+                // 旋转角度范围
+                rotationRange: [-45, 45],
+                // 旋转步长
+                rotationStep: 45,
+                // 网格大小，越大单词间隔越大
+                gridSize: 12,
+                // 是否绘制边界外的文字
+                drawOutOfBound: false,
+                // 布局算法
+                layoutAnimation: true,
+                // 文字样式
+                textStyle: {
+                    fontFamily: 'sans-serif',
+                    fontWeight: 'bold',
+                    // 颜色函数，可以在这里统一设置颜色
+                    color: function () {
+                        // 随机颜色
+                        return 'rgb(' + [
+                            Math.round(Math.random() * 160 + 50),
+                            Math.round(Math.random() * 160 + 50),
+                            Math.round(Math.random() * 160 + 50)
+                        ].join(',') + ')';
+                    }
+                },
+                // 强调样式（鼠标悬停）
+                emphasis: {
+                    focus: 'self',
+                    textStyle: {
+                        shadowBlur: 10,
+                        shadowColor: '#333'
+                    }
+                },
+                // 词云数据
+                data: wordCloudData
+            }]
+        };
+        
+        // 设置配置项
+        myChart.setOption(option);
+        
+        // 添加点击事件
+        myChart.on('click', function(params) {
+            console.log('点击关键词:', params.name);
+            filterByKeyword(params.name);
+        });
+        
+        // 响应窗口大小变化
+        window.addEventListener('resize', function() {
+            myChart.resize();
+        });
+    }
+
+    function getRandomColor() {
+        const colors = [
+            '#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6',
+            '#1abc9c', '#d35400', '#c0392b', '#16a085', '#8e44ad',
+            '#e67e22', '#27ae60', '#2980b9', '#8e44ad', '#2c3e50'
+        ];
+        return colors[Math.floor(Math.random() * colors.length)];
+    }
+    
+    // 弹窗显示
+    function showDetail(id){
+        const item = mockData.find(d => d.id === id);
+        document.getElementById('detailContent').innerHTML = `
+        <div style="max-height: 60vh; overflow-y: auto;">
+        ${item.image && item.image.length > 0 ? item.image.map(img => `<img src="${img}" alt="图片" style="max-width: 100%; margin-bottom: 10px;"><br/>`).join('') : ''}
+        <strong>${item.text}</strong><br/>
+        <br/>
+        来源：${item.source} ${item.time}<br/>
+        </div>
+      `;
+      document.getElementById('detail').style.display = 'block';
+    }
+    function showModal(id) {
+      const item = mockData.find(d => d.id === id);
+      document.getElementById('modalContent').innerHTML = `
+        <div style="max-height: 60vh; overflow-y: auto;">
+          ${item.image && item.image.length > 0 ? item.image.map(img => `<img src="${img}" alt="图片" style="max-width: 100%; margin-bottom: 10px;"><br/>`).join('') : ''}
+        <strong>${item.text}</strong><br/>
+        <br/>
+        来源：${item.source} ${item.time}<br/>
+        谣言概率：<span class="rumor-prob">${item.probability}</span>
+        </div>
+      `;
+      document.getElementById('modal').style.display = 'block';
+      document.getElementById('modal').dataset.currentId = id;
+    }
+
+    // 按钮事件处理
+    document.getElementById('btnClose1').onclick = function() {
+        document.getElementById('modal').style.display = 'none';
+    };
+    document.getElementById('btnRumor').onclick = function() {
+        const id = parseInt(document.getElementById('modal').dataset.currentId);
+        const item = mockData.find(d => d.id === id);
+        item.result = true;
+        item.dealed = true;
+        updatemanualCheckTable();
+        document.getElementById('modal').style.display = 'none';
+    };
+    document.getElementById('btnNotRumor').onclick = function() {
+        const id = parseInt(document.getElementById('modal').dataset.currentId);
+        const item = mockData.find(d => d.id === id);
+        item.result = false;
+        item.dealed = true;
+        updatemanualCheckTable();
+        document.getElementById('modal').style.display = 'none';
+    };
+    document.getElementById('btnClose2').onclick = function() {
+        document.getElementById('detail').style.display = 'none';
+    };
+    
+
+    // 关键字筛选
+    function filterByKeyword(keyword) {
+      if (searchedKeywords.has(keyword)) {
+        alert(`关键词 "${keyword}" 已经搜索过了`);
+        return;
+      }
+      searchedKeywords.add(keyword);
+      alert(`正在查找${keyword}相关内容......`);
+        fetch(`http://localhost:3000/api/keyword_query?keyword=${encodeURIComponent(keyword)}`)
+        .then(response => {
+        if (!response.ok) {
+            throw new Error('网络请求失败');
+        }
+        return response.json();
+        })
+        .then(data => {
+        if (data.success) {
+            const currentLength = mockData.length;
+            const newData = data.data.map((item, index) => ({
+                ...item,
+                id: item.id + currentLength
+            }));
+
+            mockData = [...mockData, ...newData];
+            
+            updateDataList();
+            updateResultTable();
+            updatemanualCheckTable();
+            alert(`找到 ${data.count} 条相关数据`);
+        } else {
+            alert('筛选失败: ' + (data.error || '未知错误'));
+        }
+        })
+        .catch(error => {
+            console.error('请求失败:', error);
+            alert('筛选请求失败: ' + error.message);
+        });
+    }
+    //数据初始化
+    async function initData(){
+        return fetch(`http://localhost:3000/api/init_data`)
+        .then(response => {
+        if (!response.ok) {
+            throw new Error('网络请求失败');
+        }
+        return response.json();
+        })
+        .then(data => {
+        if (data.success) {
+            alert('初始化成功: ');
+            mockData = data.data;
+            keywords = data.keywords;
+            console.log('第一条数据:', mockData[0]);
+            console.log('第一个关键词:', keywords[0]);
+            return true;
+        } else {
+            alert('初始化失败: ' + (data.error || '未知错误'));
+            return false;
+        }
+        })
+        .catch(error => {
+            console.error('请求失败:', error);
+            alert('初始化请求失败: ' + error.message);
+            return false;
+        });
+    }
+
+    // 初始化
+    window.onload = async function() {
+      const dataLoaded = await initData();
+      if(dataLoaded){
+        initDataList();
+        initResultTable();
+        initmanualCheckTable()
+        initWordCloud();
+      }else{
+        console.error('数据初始化失败');
+      }
+    };
+  </script>
+</body>
+</html>
